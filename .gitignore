@@ -1,0 +1,7 @@
+# Local organization configuration can contain branding and debug credentials.
+/config.json
+/logo.png
+*.local.log
+*.local.ps1
+/.venv/
+__pycache__/
