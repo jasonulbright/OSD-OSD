@@ -9,7 +9,7 @@ The pattern is based on Johan Schrewelius's TSBackground setup article. The samp
 Before **Setup Windows and ConfigMgr**, copy these files to the offline Windows volume:
 
 ```text
-%OSDTargetSystemDrive%\OSD-OSD\osd-osdv2.ps1
+%OSDTargetSystemDrive%\OSD-OSD\osd-osd.ps1
 %OSDTargetSystemDrive%\OSD-OSD\config.json
 %OSDTargetSystemDrive%\OSD-OSD\tools\Start-OSDBackground.cmd
 ```

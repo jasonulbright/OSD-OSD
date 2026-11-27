@@ -1,6 +1,6 @@
 # ConfigMgr task sequence setup
 
-This guide has the full setup procedure for OSD-OSD. You do not need a third-party guide to create the package or add the task sequence steps. The links at the end are optional source material.
+This guide has the full setup procedure for OSD-OSD. It includes the package, boot image, task sequence, and validation steps. Microsoft Learn links identify the ConfigMgr and Windows behavior used by this guide. CCMEXEC links provide related implementation examples.
 
 OSD-OSD is a foreground Windows Forms display. Its launcher starts a separate PowerShell process and returns control to the task sequence. Keep the ConfigMgr progress window enabled until the pilot passes.
 
@@ -28,7 +28,7 @@ Copy these files into it:
 
 ```text
 OSD-OSD\
-|-- osd-osdv2.ps1
+|-- osd-osd.ps1
 |-- config.json
 `-- tools\
     |-- Start-OSDBackground.cmd
@@ -72,17 +72,18 @@ When you change a package file, update the package source and select **Update Di
 
 ## 4. Optional: prepare the boot image for Windows PE
 
-The task sequence launcher requires Windows PowerShell. The task sequence state helpers also use Windows PowerShell if the task sequence can fail in Windows PE. OSD-OSD uses [`Get-CimInstance`](https://learn.microsoft.com/powershell/module/cimcmdlets/get-ciminstance?view=powershell-5.1) for local hardware and network queries. Microsoft lists [WinPE-WMI](https://learn.microsoft.com/windows-hardware/manufacture/desktop/winpe-add-packages--optional-components-reference?view=windows-11) as a prerequisite for WinPE-PowerShell. The script does not use CIM remoting; it queries the local system. These components do not prove that the display's Windows Forms UI can run in that boot image. Treat the Windows PE display launch as an optional pilot and confirm that the CIM cmdlets are available in the exact customized boot image.
+The task sequence launcher requires Windows PowerShell. The task sequence state helpers also use Windows PowerShell if the task sequence can fail in Windows PE. OSD-OSD uses [`Get-CimInstance`](https://learn.microsoft.com/powershell/module/cimcmdlets/get-ciminstance?view=powershell-5.1) for local hardware and network queries. Microsoft's [WinPE-PowerShell dependency list](https://learn.microsoft.com/windows-hardware/manufacture/desktop/winpe-add-packages--optional-components-reference?view=windows-11#winpe-optional-components) requires WinPE-WMI, WinPE-NetFX, and WinPE-Scripting before WinPE-PowerShell. ConfigMgr boot images include WinPE-WMI and WinPE-Scripting as required components. Add WinPE-NetFX before WinPE-PowerShell. The script does not use CIM remoting; it queries the local system. These components do not prove that the display's Windows Forms UI can run in that boot image. Treat the Windows PE display launch as an optional pilot and confirm that the CIM cmdlets are available in the exact customized boot image.
 
 1. Go to **Software Library** > **Operating Systems** > **Boot Images**.
 2. Select the boot image used by the task sequence, then open **Properties**.
 3. Open **Optional Components**.
-4. Add **WinPE-NetFX**.
-5. Add **WinPE-PowerShell**.
-6. Select **Apply** and close the properties.
-7. Right-click the boot image and select **Update Distribution Points**.
-8. Wait for the boot image content status to report success at each required distribution point.
-9. Update the task sequence to use this boot image revision, if needed.
+4. Confirm that **WinPE-WMI** and **WinPE-Scripting** are present. ConfigMgr adds these required components to its boot images.
+5. Add **WinPE-NetFX**.
+6. Add **WinPE-PowerShell** after WinPE-NetFX.
+7. Select **Apply** and close the properties.
+8. Right-click the boot image and select **Update Distribution Points**.
+9. Wait for the boot image content status to report success at each required distribution point.
+10. Update the task sequence to use this boot image revision, if needed.
 
 Do not select **Reload this boot image with the current Windows PE version** as a routine update. Reloading can remove customizations that are not managed by ConfigMgr. Record the boot image version and test this exact image on a disposable device. If Windows Forms is not visible and stable, omit the Windows PE launch and start the display in full Windows.
 
@@ -176,7 +177,7 @@ Escape closes the OSD-OSD window. The repository does not include an external st
 
 ## Optional references and attribution
 
-These references provide history and source examples. The steps above are complete without them.
+The procedures above are complete. These sources document the ConfigMgr behavior and related implementation examples.
 
 - [Microsoft: Create a package and program](https://learn.microsoft.com/intune/configmgr/apps/deploy-use/packages-and-programs#create-a-package-and-program)
 - [Microsoft: Manage boot images](https://learn.microsoft.com/intune/configmgr/osd/get-started/manage-boot-images)
