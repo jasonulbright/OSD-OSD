@@ -1,6 +1,11 @@
 # Attribution
 
-OSD-OSD is an independent implementation. It does not include TSBackground or OSDBackground source code.
+OSD-OSD includes code adapted from the TSBackground-SCCM repository. It is separate from the TSBackground and OSDBackground projects discussed in the CCMEXEC articles.
+
+## Code attribution
+
+- [nouakader2006](https://github.com/nouakader2006), [TSBackground-SCCM](https://github.com/nouakader2006/TSBackground-SCCM). Portions of the OSD-OSD display implementation derive from this repository.
+- The upstream repository uses the MIT License. Its copyright notice is `Copyright (c) 2026 NouacerAbdelkader`. The upstream copyright and MIT permission notice are included in [LICENSE](../LICENSE).
 
 ## Microsoft Learn
 
