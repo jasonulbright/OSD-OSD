@@ -2,43 +2,38 @@
 
 Review date: 2026-11-27.
 
-The review covers `osd-osdv2.ps1` version 2611.27.002 and the version 3.0.0 UI shown in the file.
+The review covers `osd-osdv2.ps1` build `2611.27.003`, the ConfigMgr task sequence patterns, helper scripts, and the static sample render.
 
-## Findings
+## Findings and proposed fixes
 
-### High: the debug password is a reusable plaintext secret
+| Finding | Impact | Proposed fix | Status |
+|---|---|---|---|
+| Shared plaintext debug password launched `cmd.exe` in the display process security context. | A package-level password is not an access control boundary. The command prompt may run with task sequence rights. | Remove password handling and the command prompt. Keep Ctrl+Shift+D as a read-only diagnostic summary. | Fixed in build `2611.27.003`. Remove old `DebugPassword` values from local configs. |
+| The display uses `ShowDialog()`. | A direct **Run PowerShell Script** step waits for the form to close and blocks the task sequence. | Use `tools/Start-OSDBackground.cmd` from a **Run Command Line** step. It starts PowerShell as a separate process and returns. | Implemented. Confirm the action returns and the display appears in the target deployment session. |
+| The display did not relaunch after a reboot. | The form process ends when the computer restarts. | Add launch steps after each reboot where the display must return. Use the optional specialize launch in `unattend.xml` for the early full Windows phase. | Documented. Validate every reboot boundary in a lab. |
+| The display treated 20 failed task sequence polls as successful completion. | A connection loss can result from a failure or restart. Technicians could see a false success state. | Require `TSBackgroundState=Complete` or `TSBackgroundState=Failed`. Keep status unknown when the connection disappears without a signal. | Fixed. Add the success and error groups described in `docs/error-handling.md`. |
+| Progress uses the next instruction pointer divided by the instruction table size. | Branches, skipped actions, and variable task durations make this a position indicator, not a measure of work completed. Remaining time can be inaccurate. | Label the percentage as approximate progress. Keep time as an estimate and avoid estimates in configured long steps. | Fixed in build `2611.27.003`; the UI says `APPROXIMATE PROGRESS`. The guide describes remaining time as an estimate. |
+| Preview mode reads real local device and network details. | A live preview can expose a hostname, serial number, domain, IP address, or MAC address on a recorded or shared screen. | Use the synthetic static render for demonstrations. A future preview-data option could replace every hardware field with configured sample values. | Documented limit. `render/osd-osdv2-preview.png` uses fake values. |
+| The script header and UI showed different version formats. | Operators could report different build identities for one file. | Keep one build identifier in the source header and UI footer. | Fixed in build `2611.27.003`. |
+| There is no dedicated external stop action. | A display can remain open after an abnormal exit when no reboot occurs. | Add a tested cleanup step that targets this script path and process session. Never stop all PowerShell processes by name. | Not implemented. Pilot and define the target session before adding cleanup. |
 
-Ctrl+Shift+D prompts for `DebugPassword`. If the input matches the JSON value, the script starts `cmd.exe` in the script process security context. A task sequence commonly runs with Local System rights. A password in a package is not a reliable access-control boundary. Remove the feature or replace it with a controlled diagnostic mechanism before production use. The example config does not include a password.
+## Task sequence design
 
-### High: the modal display blocks a direct task sequence script action
+The recommended pilot uses an asynchronous command-line launcher, explicit task sequence state, a success group, and an error group. The error group stores the failed action and return code before it runs other handler steps. This follows Microsoft's documented use of `_SMSTSLastActionSucceeded` and Jörgen Nilsson's 2016 OSDBackground example.
 
-The script ends with `ShowDialog()`. A **Run PowerShell Script** action that calls it directly waits for the display to close. The task sequence cannot progress while that action waits. Start the process asynchronously from a command line action and validate the behavior in a pilot.
+The optional early Windows launch uses `RunSynchronousCommand` during specialize. Microsoft documents this command as running in the system context and waiting for completion in that pass. The sample starts a detached process, but this repository has not validated whether the window is visible on each target Windows build. Use the normal post-setup launch if the form is not visible.
 
-### High: the process does not relaunch itself after a reboot
-
-The script saves a start time and active step in task sequence variables. It does not arrange to start again after a reboot. A reboot ends the process. Add a launch step after every required reboot, or add and validate a separate relaunch mechanism.
-
-### Medium: percentage and remaining-time values can mislead technicians
-
-The code divides `_SMSTSNextInstructionPointer` by `_SMSTSInstructionTableSize`. Branches and skipped actions can make this value differ from completed work. The remaining-time estimate uses the change in percentage over elapsed time. Deployment speed can change. Keep the percentage as a position indicator and present the remaining-time value as an estimate.
-
-### Medium: the example preview uses real machine details when run
-
-`PreviewPercent` and `PreviewStep` set progress values when no task sequence is detected. The script still reads the current machine's serial number, model, BIOS, domain, IP address, and MAC address. The static image in `render/` uses fake values. Do not use the live script on a shared or recorded screen for a fake-data demonstration.
-
-### Low: the file and UI show different version formats
-
-The script header says `2611.27.002`. The footer shows `$AppVersion`, which is `3.0.0`. Keep one build identifier or show both labels clearly.
+OSD-OSD is a foreground display. It does not replace `smsts.log`, the ConfigMgr task sequence progress UI, or an organization-approved recovery process.
 
 ## Positive observations
 
-- The v2 UI uses one custom-painted canvas and scales its layout from the screen dimensions.
-- The code caches its background bitmap and fonts instead of rebuilding them every refresh.
-- The step tracker shows completed, active, and pending phases with separate labels and descriptions.
+- The v2 UI uses one custom-painted canvas and scales its layout from screen dimensions.
+- The script caches its background bitmap and fonts between refreshes.
+- The step tracker shows completed, active, and pending phases with separate labels.
 - The remaining-time logic suppresses guesses during configured long steps.
 - The script logs diagnostics to `%SystemRoot%\Temp\TSBackground-OSD.log` and limits repeated error messages with `Write-LogOnce`.
-- The example config omits `DebugPassword`.
+- The repository preview is a static render with synthetic device data.
 
 ## Review limits
 
-This was a static review. PSScriptAnalyzer with the shared settings reported warnings for unapproved internal verbs, legacy WMI cmdlets, empty catch blocks, the automatic variable `sender`, and the `WasVisible` assignment. It reported no errors. The Windows Forms application was not run on the dev PC. The SVG preview is a separate static render with synthetic values. No ConfigMgr task sequence, Windows PE boot image, reboot flow, or package was exercised. Verify those flows in the ConfigMgr lab before production use.
+This is a static code and documentation review. The PowerShell parser accepted all three PowerShell files. The example JSON parsed. PSScriptAnalyzer reported 45 warnings in the main UI script and no findings in the two helper scripts. The warning groups are empty catch blocks, WMI cmdlets, unapproved internal verbs, assignments to the automatic variable `sender`, an unused visibility variable, and the `Write-Log` function name. No ConfigMgr task sequence, boot image, unattend deployment, reboot flow, or error path has been exercised. Validate these flows in the ConfigMgr lab before production use.

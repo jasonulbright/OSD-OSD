@@ -33,7 +33,7 @@ The script shows preview progress values when a task sequence is not detected. I
 4. Run `osd-osdv2.ps1` in an approved Windows test environment.
 5. Follow [the task sequence setup guide](docs/task-sequence-setup.md) to package and launch it.
 
-Do not commit `config.json`. It is ignored because it can contain organization-specific data and a plaintext debug password. The example does not include a debug password.
+Do not commit `config.json` when it contains organization-specific values. The example contains only sample values. The Ctrl+Shift+D shortcut opens read-only diagnostics; it does not launch a command prompt or require a password.
 
 ## Files
 
@@ -41,15 +41,25 @@ Do not commit `config.json`. It is ignored because it can contain organization-s
 |---|---|
 | `osd-osdv2.ps1` | Windows Forms task sequence display. |
 | `config.example.json` | Safe starter configuration. |
-| `docs/task-sequence-setup.md` | ConfigMgr package and task sequence steps. |
+| `docs/task-sequence-setup.md` | Package setup and launch steps in Windows PE and full Windows. |
 | `docs/configuration.md` | Configuration key reference and keyword behavior. |
-| `docs/review.md` | Review findings and known limits. |
+| `docs/error-handling.md` | Success and error groups with explicit display state. |
+| `docs/unattend-launch.md` | Optional early full Windows launch from unattend.xml. |
+| `docs/attribution.md` | Source history and figure credits. |
+| `docs/review.md` | Review findings, proposed fixes, and validation limits. |
+| `tools/Start-OSDBackground.cmd` | Starts the display as a separate process. |
+| `tools/Set-OSDBackgroundState.ps1` | Signals Running, Complete, or Failed to the display. |
+| `tools/Exit-OSDBackgroundWithOriginalCode.ps1` | Returns the saved task sequence failure code. |
 | `render/osd-osdv2-preview.png` | Rendered v2 sample with synthetic data. |
 | `render/osd-osdv2-preview.svg` | Editable source for the static render. |
 
 ## Task sequence state
 
-The script stores `TSBackgroundStartTime` and `TSBackgroundCurrentStep` through `Microsoft.SMS.TSEnvironment`. Those values preserve data only while the task sequence environment is available. The script does not install a startup task or relaunch itself after a reboot. See [the setup guide](docs/task-sequence-setup.md) and [the review](docs/review.md) before deployment.
+The script stores `TSBackgroundStartTime` and `TSBackgroundCurrentStep` through `Microsoft.SMS.TSEnvironment`. Explicit `TSBackgroundState` signals control complete and failed status. Loss of the task sequence connection does not count as success. The script does not install a startup task or relaunch itself after a reboot. See [the setup guide](docs/task-sequence-setup.md), [error handling](docs/error-handling.md), and [the review](docs/review.md) before deployment.
+
+## Attribution
+
+The setup and error handling guidance builds on the referenced posts by Jörgen Nilsson and Johan Schrewelius. The source figures are embedded from CCMEXEC.COM and are credited in the [setup guide](docs/task-sequence-setup.md). See [attribution](docs/attribution.md) for details.
 
 ## License
 

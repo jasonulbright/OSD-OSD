@@ -1,4 +1,4 @@
-# Local organization configuration can contain branding and debug credentials.
+# Local organization configuration can contain organization-specific values.
 /config.json
 /logo.png
 *.local.log

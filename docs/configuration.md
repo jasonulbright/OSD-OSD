@@ -24,13 +24,14 @@ Start from `config.example.json`. The example includes `PreviewPercent` and `Pre
 | Key | Type | Purpose |
 |---|---|---|
 | `HideSCCMProgress` | boolean | Enables the existing code that hides the standard task sequence progress window. This key keeps its legacy name. |
-| `AutoCloseOnCompletion` | boolean | Closes the display after the script detects that the task sequence environment has ended. |
+| `AutoCloseOnCompletion` | boolean | Closes the display a few seconds after the success path sets `TSBackgroundState` to `Complete`. |
 | `NoEstimateSteps` | integer array | Step IDs where the script suppresses its remaining-time estimate. The default is `[2]`. |
 | `PreviewPercent` | integer | Percentage shown only when no task sequence is detected. |
 | `PreviewStep` | integer | Active step ID shown only when no task sequence is detected. |
-| `DebugPassword` | string | Legacy plaintext password for the Ctrl+Shift+D command prompt. Do not configure this feature on production devices. |
 
 The script starts the task sequence display with `PreviewPercent` and `PreviewStep` when no task sequence is detected. It does not replace the hardware and network values with synthetic values.
+
+The task sequence sets `TSBackgroundState` to `Running`, `Complete`, or `Failed`. The display reads the final state and any failure details. See [task sequence error handling](error-handling.md).
 
 ## Theme
 
@@ -63,4 +64,4 @@ The overall percentage is calculated from the next instruction pointer and instr
 
 ## Security
 
-The legacy debug feature compares a typed value with `DebugPassword` in plaintext. It then starts `cmd.exe` without alternate credentials. The command prompt uses the script process security context. The configuration is not a safe access-control boundary. Do not put a shared password in a deployed package. See [the review](review.md).
+Ctrl+Shift+D opens a read-only diagnostic summary. It does not start a command prompt. Remove any old `DebugPassword` key from a local config file. See [the review](review.md) and [task sequence error handling](error-handling.md).

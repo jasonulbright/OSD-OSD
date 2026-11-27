@@ -5,13 +5,13 @@
     Modern TS progress UI with dynamic step tracker.
     Real-time task sequence variables.
 	Persistent timer across WinPE/FullOS reboots.
-    Optional hiding of the standard SCCM progress window (HideSCCMProgress).
-	Password-protected debug console (Ctrl+Shift+D).
+    Optional hiding of the standard ConfigMgr progress window (HideSCCMProgress).
+	Read-only diagnostic summary (Ctrl+Shift+D).
 	Organization branding support via logo.png.
 .AUTHOR
     Jason Ulbright
 .VERSION
-    2611.27.002
+    2611.27.003
 #>
 
 param(
@@ -20,11 +20,10 @@ param(
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName Microsoft.VisualBasic
 
-$AppVersion = "3.0.0"
+$AppVersion = "2611.27.003"
 
-# --- Win32 API: hide the standard SCCM "Installation Progress" window + DPI awareness ---
+# --- Win32 API: hide the standard ConfigMgr "Installation Progress" window + DPI awareness ---
 $Win32Code = @"
 using System;
 using System.Runtime.InteropServices;
@@ -454,6 +453,10 @@ $script:UIUnregistered = $false
 $script:LastTSError = $null
 $script:TSFailCount = 0
 $script:Finished = $false
+$script:Failed = $false
+$script:StatusUnavailable = $false
+$script:FailureCode = ''
+$script:FailureAction = ''
 $script:EndTime = $null
 $script:CloseAt = $null
 $script:PctValue = 0
@@ -553,6 +556,8 @@ function Test-StepMatch {
 }
 
 function Get-StatusTitle {
+    if ($script:Failed) { return 'Deployment failed' }
+    if ($script:StatusUnavailable) { return 'Deployment status unavailable' }
     if ($script:Finished) { return 'Deployment complete' }
     $step = $PhaseList | Where-Object { [int]$_.Id -eq [int]$script:CurrentStepMax } | Select-Object -First 1
     if ($step) {
@@ -590,7 +595,9 @@ function Paint-Header {
 
     # Top-right status pill
     $pc = $ColAccent
-    if ($script:Finished) { $pc = $ColGreen }
+    if ($script:Failed) { $pc = [System.Drawing.Color]::FromArgb(239, 68, 68) }
+    elseif ($script:StatusUnavailable) { $pc = [System.Drawing.Color]::FromArgb(245, 158, 11) }
+    elseif ($script:Finished) { $pc = $ColGreen }
     $f  = Get-Fnt 'Segoe UI' (16.5 * $s) $false
     $tw = Get-SpacedWidth $g $script:PillText $f (1.4 * $s)
     $pw = $tw + 76 * $s
@@ -624,7 +631,7 @@ function Paint-Hero {
     $nw   = $g.MeasureString($num, $fBig, 3000, $SfMeasure).Width
     Draw-Text $g $num $fBig $BrText $x0 ($y0 + 90.5 * $s) 3000 'L'
     Draw-Text $g '%' $fPct $BrDim ($x0 + $nw + 8 * $s) ($y0 + 126 * $s) 600 'L'
-    Draw-Spaced $g 'OVERALL PROGRESS' (Get-Fnt 'Segoe UI' (17 * $s) $false) $BrDim ($x0 + 44 * $s) ($y0 + 196 * $s) (4.6 * $s)
+    Draw-Spaced $g 'APPROXIMATE PROGRESS' (Get-Fnt 'Segoe UI' (17 * $s) $false) $BrDim ($x0 + 44 * $s) ($y0 + 196 * $s) (4.6 * $s)
 
     # Vertical divider
     Draw-Line $g $script:Pens.sepV ($x0 + 403 * $s) ($y0 + 3 * $s) ($x0 + 403 * $s) ($y0 + 237 * $s)
@@ -638,7 +645,8 @@ function Paint-Hero {
 
     # Status line
     $sc = $ColAccent
-    if ($script:Finished) { $sc = $ColGreen }
+    if ($script:Failed) { $sc = [System.Drawing.Color]::FromArgb(239, 68, 68) }
+    elseif ($script:Finished) { $sc = $ColGreen }
     $da = 255
     if ($script:Pulse -eq 1) { $da = 140 }
     $db = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($da, $sc))
@@ -1017,7 +1025,7 @@ Write-Log ("START v{0} PS={1} Apartment={2} Dir={3} Steps={4} Win32Type={5} Is64
 $UpdateUI = {
     try {
     # 1. Timer, pulse and remaining-time estimate
-    $Now = if ($script:Finished -and $script:EndTime) { $script:EndTime } else { Get-Date }
+    $Now = if (($script:Finished -or $script:Failed) -and $script:EndTime) { $script:EndTime } else { Get-Date }
     $Elapsed = $Now - $StartTime
     if ($script:CloseAt -and (Get-Date) -ge $script:CloseAt) {
         $script:CloseAt = $null
@@ -1029,7 +1037,11 @@ $UpdateUI = {
 
     $RemainText = 'Estimating remaining time...'
     $InLongStep = ($NoEstSteps -contains [int]$script:CurrentStepMax)
-    if ($script:Finished) {
+    if ($script:Failed) {
+        $RemainText = 'Deployment failed - contact the service desk'
+    } elseif ($script:StatusUnavailable) {
+        $RemainText = 'Waiting for task sequence status'
+    } elseif ($script:Finished) {
         $RemainText = 'Deployment complete'
     } elseif ($InLongStep) {
         # Duration depends on image size and network: do not guess
@@ -1065,7 +1077,7 @@ $UpdateUI = {
 
     } catch { Write-Log "Section 1 (timer): $_" }
     try {
-    # 2. Hide SCCM "Installation Progress" window if enabled
+    # 2. Hide ConfigMgr "Installation Progress" window if enabled
     if ($Config.HideSCCMProgress -eq $true) {
         # a) Official method: TsProgressUI.exe /Unregister (once per phase)
         if (-not $script:UIUnregistered) {
@@ -1099,7 +1111,7 @@ $UpdateUI = {
 
     } catch { Write-Log "Section 2 (hide window): $_" }
     try {
-    # 3. Connect to SCCM Task Sequence Environment
+    # 3. Connect to ConfigMgr Task Sequence Environment
     $TSEnv = $null
     try {
         if ($null -eq $script:TSEnvObj) {
@@ -1114,7 +1126,7 @@ $UpdateUI = {
         if (-not $script:TSConnected) { Write-Log "TS environment connected" }
         $script:TSConnected = $true
         $script:TSFailCount = 0
-        if ($script:Finished) { $script:Finished = $false; $script:CloseAt = $null; $script:EndTime = $null }
+        $script:StatusUnavailable = $false
     } catch {
         $ErrMsg = $_.Exception.Message
         if ($ErrMsg -ne $script:LastTSError) {
@@ -1125,14 +1137,10 @@ $UpdateUI = {
         $script:TSEnvObj = $null
         $TSEnv = $null
         $script:TSFailCount++
-        if ($script:TSConnected -and -not $script:Finished -and $script:TSFailCount -ge 20) {
-            $script:Finished       = $true
-            $script:EndTime        = Get-Date
-            $script:CurrentStepMax = [int]$SortedIds[-1] + 1
-            $script:PctValue       = 100
-            $script:CurrentActionText = 'Your device is ready'
-            Write-Log "TS environment gone for 20 ticks: deployment complete (AutoClose=$AutoClose)"
-            if ($AutoClose) { $script:CloseAt = (Get-Date).AddSeconds(5) }
+        if ($script:TSConnected -and -not $script:Finished -and -not $script:Failed -and $script:TSFailCount -ge 20) {
+            $script:StatusUnavailable = $true
+            $script:CurrentActionText = 'Task sequence connection lost; status is unknown'
+            Write-LogOnce 'ts-lost' 'Task sequence connection lost; completion was not confirmed'
         }
         if (-not $script:TSConnected) {
             $script:CurrentActionText = 'Preview mode - task sequence not detected'
@@ -1149,12 +1157,44 @@ $UpdateUI = {
 
         if (-not [string]::IsNullOrWhiteSpace($PCName)) { $script:vPC = [string]$PCName }
 
-        if ($StepRaw -match '^\d+$' -and $TotalRaw -match '^\d+$' -and [int]$TotalRaw -gt 0) {
+        $DeploymentState = [string]$TSEnv.Value('TSBackgroundState')
+        if ($DeploymentState -eq 'Running' -and ($script:Finished -or $script:Failed)) {
+            $script:Finished = $false
+            $script:Failed = $false
+            $script:FailureCode = ''
+            $script:FailureAction = ''
+            $script:CloseAt = $null
+            $script:EndTime = $null
+        }
+        if ($DeploymentState -eq 'Complete' -and -not $script:Finished) {
+            $script:Finished = $true
+            $script:Failed = $false
+            $script:StatusUnavailable = $false
+            $script:EndTime = Get-Date
+            $script:CurrentStepMax = [int]$SortedIds[-1] + 1
+            $script:PctValue = 100
+            $script:CurrentActionText = 'Your device is ready'
+            if ($AutoClose) { $script:CloseAt = (Get-Date).AddSeconds(5) }
+            Write-Log 'Task sequence signaled successful completion'
+        } elseif ($DeploymentState -eq 'Failed' -and -not $script:Failed) {
+            $script:Failed = $true
+            $script:Finished = $false
+            $script:StatusUnavailable = $false
+            $script:FailureCode = [string]$TSEnv.Value('TSBackgroundErrorCode')
+            $script:FailureAction = [string]$TSEnv.Value('TSBackgroundErrorAction')
+            $script:EndTime = Get-Date
+            $script:CloseAt = $null
+            if ($script:FailureAction) { $script:CurrentActionText = "Failed: $($script:FailureAction)" }
+            else { $script:CurrentActionText = 'The task sequence reported a failure' }
+            Write-Log "Task sequence signaled failure: Action='$($script:FailureAction)' Code='$($script:FailureCode)'"
+        }
+
+        if (-not $script:Finished -and -not $script:Failed -and $StepRaw -match '^\d+$' -and $TotalRaw -match '^\d+$' -and [int]$TotalRaw -gt 0) {
             $script:StatStep = "$StepRaw / $TotalRaw"
             $script:PctValue = [Math]::Min(100, [Math]::Round(([int]$StepRaw / [int]$TotalRaw) * 100))
         }
 
-        if ($CurrentAction -ne $script:LastAction) {
+        if (-not $script:Finished -and -not $script:Failed -and $CurrentAction -ne $script:LastAction) {
             $script:LastAction = $CurrentAction
             Write-Log "Action='$CurrentAction' Progress=$StepRaw/$TotalRaw Step=$($script:CurrentStepMax)"
         }
@@ -1200,13 +1240,22 @@ $UpdateUI = {
     $nSteps = $SortedIds.Count
     $idx    = [Array]::IndexOf($SortedIds, [int]$script:CurrentStepMax)
     $stepNo = $idx + 1
-    if ($script:Finished -or $stepNo -gt $nSteps) { $stepNo = $nSteps }
+    if ($script:Finished -or $script:Failed -or $stepNo -gt $nSteps) { $stepNo = $nSteps }
     if ($stepNo -lt 1) { $stepNo = 1 }
     $script:StepCaption = "Step $stepNo of $nSteps"
 
-    if ($script:Finished) {
+    if ($script:Failed) {
+        $script:StatState = if ($script:FailureCode) { "Deployment failed ($($script:FailureCode))" } else { 'Deployment failed' }
+        $script:PillText = 'DEPLOYMENT FAILED'
+        if ($script:FailureAction) { $script:CurrentActionText = "Failed: $($script:FailureAction)" }
+        else { $script:CurrentActionText = 'The task sequence reported a failure' }
+    } elseif ($script:StatusUnavailable) {
+        $script:StatState = 'Task sequence status unavailable'
+        $script:PillText = 'STATUS UNKNOWN'
+    } elseif ($script:Finished) {
         $script:StatState = 'Deployment complete'
         $script:PillText  = 'DEPLOYMENT COMPLETE'
+        $script:CurrentActionText = 'Your device is ready'
     } elseif ($script:TSConnected) {
         $script:StatState = 'Task sequence running'
         $script:PillText  = $PillRunning
@@ -1230,10 +1279,15 @@ $Form.Add_KeyDown({
         $Form.Close()
     }
     elseif ($e.Control -and $e.Shift -and $e.KeyCode -eq [System.Windows.Forms.Keys]::D) {
-        $PwdInput = [Microsoft.VisualBasic.Interaction]::InputBox("Enter administrator password to open Command Prompt:", "OSD Diagnostic", "")
-        if (-not [string]::IsNullOrEmpty($Config.DebugPassword) -and $PwdInput -eq $Config.DebugPassword) {
-            Start-Process "cmd.exe"
-        }
+        $Diag = @(
+            "Task sequence state: $($script:StatState)",
+            "Current action: $($script:CurrentActionText)",
+            "Progress: $($script:PctValue)%",
+            "Failure action: $($script:FailureAction)",
+            "Failure code: $($script:FailureCode)",
+            "Log file: $LogFile"
+        ) -join [Environment]::NewLine
+        [void][System.Windows.Forms.MessageBox]::Show($Form, $Diag, 'OSD-OSD diagnostics', [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     }
 })
 
