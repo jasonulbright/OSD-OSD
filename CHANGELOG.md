@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replace legacy PowerShell WMI cmdlets with local `Get-CimInstance` queries. Remove all shared PSScriptAnalyzer findings from the display script.
 - Replace the older interface with the updated v2 display.
 - Add v2 configuration, task sequence setup guidance, and a fake-data preview.
 - Add asynchronous launch and unattend launch guidance with helper scripts.

@@ -72,7 +72,7 @@ When you change a package file, update the package source and select **Update Di
 
 ## 4. Optional: prepare the boot image for Windows PE
 
-The task sequence launcher requires Windows PowerShell. The task sequence state helpers also use Windows PowerShell if the task sequence can fail in Windows PE. Windows PE PowerShell requires the .NET component. These components do not prove that the display's Windows Forms UI can run in that boot image. Treat the Windows PE display launch as an optional pilot.
+The task sequence launcher requires Windows PowerShell. The task sequence state helpers also use Windows PowerShell if the task sequence can fail in Windows PE. OSD-OSD uses [`Get-CimInstance`](https://learn.microsoft.com/powershell/module/cimcmdlets/get-ciminstance?view=powershell-5.1) for local hardware and network queries. Microsoft lists [WinPE-WMI](https://learn.microsoft.com/windows-hardware/manufacture/desktop/winpe-add-packages--optional-components-reference?view=windows-11) as a prerequisite for WinPE-PowerShell. The script does not use CIM remoting; it queries the local system. These components do not prove that the display's Windows Forms UI can run in that boot image. Treat the Windows PE display launch as an optional pilot and confirm that the CIM cmdlets are available in the exact customized boot image.
 
 1. Go to **Software Library** > **Operating Systems** > **Boot Images**.
 2. Select the boot image used by the task sequence, then open **Properties**.

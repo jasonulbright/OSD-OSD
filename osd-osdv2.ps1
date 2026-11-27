@@ -11,7 +11,7 @@
 .AUTHOR
     Jason Ulbright
 .VERSION
-    2611.27.003
+    2611.27.004
 #>
 
 param(
@@ -21,7 +21,7 @@ param(
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$AppVersion = "2611.27.003"
+$AppVersion = "2611.27.004"
 
 # --- Win32 API: hide the standard ConfigMgr "Installation Progress" window + DPI awareness ---
 $Win32Code = @"
@@ -39,20 +39,20 @@ public class Win32Window {
 }
 "@
 Add-Type -TypeDefinition $Win32Code -ErrorAction SilentlyContinue
-try { [void][Win32Window]::SetProcessDPIAware() } catch { }
+try { [void][Win32Window]::SetProcessDPIAware() } catch { Write-Debug ("SetProcessDPIAware failed: {0}" -f $_) }
 
 # --- Diagnostic log (read it with: type %SystemRoot%\Temp\osd-osd.log) ---
 $LogFile = Join-Path $env:SystemRoot "Temp\osd-osd.log"
-function Write-Log {
+function Write-OSDLog {
     param([string]$Message)
-    try { Add-Content -Path $LogFile -Value ("{0} {1}" -f (Get-Date -Format "HH:mm:ss"), $Message) -ErrorAction SilentlyContinue } catch { }
+    try { Add-Content -Path $LogFile -Value ("{0} {1}" -f (Get-Date -Format "HH:mm:ss"), $Message) -ErrorAction SilentlyContinue } catch { Write-Debug ("Could not write OSD-OSD log: {0}" -f $_) }
 }
 $script:LoggedOnce = @{}
-function Write-LogOnce {
+function Write-OSDLogOnce {
     param([string]$Key, [string]$Message)
     if (-not $script:LoggedOnce.ContainsKey($Key)) {
         $script:LoggedOnce[$Key] = $true
-        Write-Log $Message
+        Write-OSDLog $Message
     }
 }
 
@@ -96,6 +96,7 @@ try {
     }
 } catch {
     # Out-of-sequence mode (local test)
+    Write-Debug ("Task sequence COM environment is unavailable: {0}" -f $_)
 }
 
 # ==============================================================================
@@ -165,7 +166,7 @@ function ConvertTo-ThemeColor {
     try { return [System.Drawing.ColorTranslator]::FromHtml([string]$Hex) } catch { return [System.Drawing.ColorTranslator]::FromHtml($Fallback) }
 }
 
-function Scale-Color {
+function ConvertTo-ScaledColor {
     param($Color, [double]$Factor)
     $rr = [int][Math]::Min(255, [Math]::Max(0, $Color.R * $Factor))
     $gg = [int][Math]::Min(255, [Math]::Max(0, $Color.G * $Factor))
@@ -211,7 +212,7 @@ foreach ($sfx in @($SfL, $SfC, $SfR)) {
     $sfx.FormatFlags   = [System.Drawing.StringFormatFlags]'NoWrap, NoClip'
 }
 
-function Draw-Text {
+function Write-Text {
     param($g, [string]$Text, $Font, $Brush, $X, $Cy, $W, [string]$Align = 'L')
     if ([string]::IsNullOrEmpty($Text)) { return }
     $sf = $SfL
@@ -231,7 +232,7 @@ function Get-SpacedWidth {
     return ($tw - $Spacing)
 }
 
-function Draw-Spaced {
+function Write-SpacedText {
     param($g, [string]$Text, $Font, $Brush, $X, $Cy, $Spacing)
     $cx = [double]$X
     foreach ($c in $Text.ToCharArray()) {
@@ -239,37 +240,37 @@ function Draw-Spaced {
             $cx += $Font.Size * 0.28 + $Spacing
         } else {
             $ch = [string]$c
-            Draw-Text $g $ch $Font $Brush $cx $Cy ($Font.Size * 2) 'L'
+            Write-Text $g $ch $Font $Brush $cx $Cy ($Font.Size * 2) 'L'
             $cx += $g.MeasureString($ch, $Font, 1000, $SfMeasure).Width + $Spacing
         }
     }
 }
 
-function Fill-RR {
+function Write-RoundedRectangleFill {
     param($g, $Brush, $X, $Y, $W, $H, $R)
     $p = New-RoundedPath -X $X -Y $Y -W $W -H $H -R $R
     $g.FillPath($Brush, $p)
     $p.Dispose()
 }
 
-function Draw-RR {
+function Write-RoundedRectangle {
     param($g, $Pen, $X, $Y, $W, $H, $R)
     $p = New-RoundedPath -X $X -Y $Y -W $W -H $H -R $R
     $g.DrawPath($Pen, $p)
     $p.Dispose()
 }
 
-function Fill-Circle {
+function Write-CircleFill {
     param($g, $Brush, $Cx, $Cy, $R)
     $g.FillEllipse($Brush, (New-RectF ($Cx - $R) ($Cy - $R) (2 * $R) (2 * $R)))
 }
 
-function Draw-Circle {
+function Write-Circle {
     param($g, $Pen, $Cx, $Cy, $R)
     $g.DrawEllipse($Pen, (New-RectF ($Cx - $R) ($Cy - $R) (2 * $R) (2 * $R)))
 }
 
-function Draw-Line {
+function Write-Line {
     param($g, $Pen, $X1, $Y1, $X2, $Y2)
     $g.DrawLine($Pen, [single]$X1, [single]$Y1, [single]$X2, [single]$Y2)
 }
@@ -347,8 +348,8 @@ function Build-Background {
         $bg  = [System.Drawing.Graphics]::FromImage($bmp)
         $bg.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $rc  = New-RectF 0 0 $W $H
-        $c1  = Scale-Color $ColBg 0.72
-        $c2  = Scale-Color $ColBg 1.12
+        $c1  = ConvertTo-ScaledColor $ColBg 0.72
+        $c2  = ConvertTo-ScaledColor $ColBg 1.12
         $lg  = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rc, $c1, $c2, [single]35)
         $bg.FillRectangle($lg, $rc)
         $lg.Dispose()
@@ -358,7 +359,7 @@ function Build-Background {
         $bg.Dispose()
         $script:BgBmp = $bmp
     } catch {
-        Write-LogOnce 'bg' "Build-Background: $_"
+        Write-OSDLogOnce 'bg' "Build-Background: $_"
         $script:BgBmp = $null
     }
 }
@@ -366,46 +367,46 @@ function Build-Background {
 # ==============================================================================
 # ICONS (vector, no icon font needed in WinPE)
 # ==============================================================================
-function Draw-IconLaptop {
+function Write-LaptopIcon {
     param($g, $X, $Y, $s)
     $p = $script:Pens.icon
-    Draw-RR $g $p ($X + 7 * $s) ($Y + 2 * $s) (48 * $s) (30 * $s) (4 * $s)
-    Draw-Line $g $p ($X + 0 * $s) ($Y + 40 * $s) ($X + 62 * $s) ($Y + 40 * $s)
+    Write-RoundedRectangle $g $p ($X + 7 * $s) ($Y + 2 * $s) (48 * $s) (30 * $s) (4 * $s)
+    Write-Line $g $p ($X + 0 * $s) ($Y + 40 * $s) ($X + 62 * $s) ($Y + 40 * $s)
 }
 
-function Draw-IconNetwork {
+function Write-NetworkIcon {
     param($g, $X, $Y, $s)
     $p = $script:Pens.icon
-    Draw-RR $g $p ($X + 23 * $s) ($Y + 0 * $s) (16 * $s) (16 * $s) (3 * $s)
-    Draw-RR $g $p ($X + 0 * $s) ($Y + 34 * $s) (16 * $s) (16 * $s) (3 * $s)
-    Draw-RR $g $p ($X + 46 * $s) ($Y + 34 * $s) (16 * $s) (16 * $s) (3 * $s)
-    Draw-Line $g $p ($X + 31 * $s) ($Y + 16 * $s) ($X + 31 * $s) ($Y + 25 * $s)
-    Draw-Line $g $p ($X + 8 * $s) ($Y + 25 * $s) ($X + 54 * $s) ($Y + 25 * $s)
-    Draw-Line $g $p ($X + 8 * $s) ($Y + 25 * $s) ($X + 8 * $s) ($Y + 34 * $s)
-    Draw-Line $g $p ($X + 54 * $s) ($Y + 25 * $s) ($X + 54 * $s) ($Y + 34 * $s)
+    Write-RoundedRectangle $g $p ($X + 23 * $s) ($Y + 0 * $s) (16 * $s) (16 * $s) (3 * $s)
+    Write-RoundedRectangle $g $p ($X + 0 * $s) ($Y + 34 * $s) (16 * $s) (16 * $s) (3 * $s)
+    Write-RoundedRectangle $g $p ($X + 46 * $s) ($Y + 34 * $s) (16 * $s) (16 * $s) (3 * $s)
+    Write-Line $g $p ($X + 31 * $s) ($Y + 16 * $s) ($X + 31 * $s) ($Y + 25 * $s)
+    Write-Line $g $p ($X + 8 * $s) ($Y + 25 * $s) ($X + 54 * $s) ($Y + 25 * $s)
+    Write-Line $g $p ($X + 8 * $s) ($Y + 25 * $s) ($X + 8 * $s) ($Y + 34 * $s)
+    Write-Line $g $p ($X + 54 * $s) ($Y + 25 * $s) ($X + 54 * $s) ($Y + 34 * $s)
 }
 
-function Draw-IconClock {
+function Write-ClockIcon {
     param($g, $X, $Y, $s)
     $p  = $script:Pens.icon
     $cx = $X + 31 * $s
     $cy = $Y + 25 * $s
-    Draw-Circle $g $p $cx $cy (24 * $s)
-    Draw-Line $g $p $cx $cy $cx ($cy - 13 * $s)
-    Draw-Line $g $p $cx $cy ($cx + 10 * $s) ($cy + 6 * $s)
+    Write-Circle $g $p $cx $cy (24 * $s)
+    Write-Line $g $p $cx $cy $cx ($cy - 13 * $s)
+    Write-Line $g $p $cx $cy ($cx + 10 * $s) ($cy + 6 * $s)
 }
 
-function Draw-IconHeadset {
+function Write-HeadsetIcon {
     param($g, $X, $Y, $s)
     $p = $script:Pens.icon2
     $g.DrawArc($p, (New-RectF ($X + 3 * $s) ($Y + 1 * $s) (24 * $s) (24 * $s)), [single]180, [single]180)
-    Draw-RR $g $p ($X + 0 * $s) ($Y + 13 * $s) (7 * $s) (11 * $s) (2.5 * $s)
-    Draw-RR $g $p ($X + 23 * $s) ($Y + 13 * $s) (7 * $s) (11 * $s) (2.5 * $s)
-    Draw-Line $g $p ($X + 26 * $s) ($Y + 24 * $s) ($X + 26 * $s) ($Y + 28 * $s)
-    Draw-Line $g $p ($X + 26 * $s) ($Y + 28 * $s) ($X + 18 * $s) ($Y + 29 * $s)
+    Write-RoundedRectangle $g $p ($X + 0 * $s) ($Y + 13 * $s) (7 * $s) (11 * $s) (2.5 * $s)
+    Write-RoundedRectangle $g $p ($X + 23 * $s) ($Y + 13 * $s) (7 * $s) (11 * $s) (2.5 * $s)
+    Write-Line $g $p ($X + 26 * $s) ($Y + 24 * $s) ($X + 26 * $s) ($Y + 28 * $s)
+    Write-Line $g $p ($X + 26 * $s) ($Y + 28 * $s) ($X + 18 * $s) ($Y + 29 * $s)
 }
 
-function Fill-Arrow {
+function Write-ArrowFill {
     param($g, $Cx, $Cy, $R, $Ang, $s)
     $t  = $Ang * [Math]::PI / 180.0
     $px = $Cx + $R * [Math]::Cos($t)
@@ -424,14 +425,14 @@ function Fill-Arrow {
     $g.FillPolygon($BrAccent, $pts)
 }
 
-function Draw-IconRestart {
+function Write-RestartIcon {
     param($g, $Cx, $Cy, $s)
     $r = 11 * $s
     $p = $script:Pens.icon2
     $g.DrawArc($p, (New-RectF ($Cx - $r) ($Cy - $r) (2 * $r) (2 * $r)), [single]200, [single]140)
     $g.DrawArc($p, (New-RectF ($Cx - $r) ($Cy - $r) (2 * $r) (2 * $r)), [single]20, [single]140)
-    Fill-Arrow $g $Cx $Cy $r 340 $s
-    Fill-Arrow $g $Cx $Cy $r 160 $s
+    Write-ArrowFill $g $Cx $Cy $r 340 $s
+    Write-ArrowFill $g $Cx $Cy $r 160 $s
 }
 
 # ==============================================================================
@@ -488,7 +489,7 @@ $script:LogoImage = $null
 if (-not [string]::IsNullOrEmpty($Config.LogoPath)) {
     $LogoFullPath = Join-Path $ScriptDir $Config.LogoPath
     if (Test-Path $LogoFullPath) {
-        try { $script:LogoImage = [System.Drawing.Image]::FromFile($LogoFullPath) } catch { }
+        try { $script:LogoImage = [System.Drawing.Image]::FromFile($LogoFullPath) } catch { Write-OSDLogOnce 'logo-load' ("Could not load configured logo: {0}" -f $_) }
     }
 }
 
@@ -502,27 +503,27 @@ function Get-CompanyDomain {
         try {
             $d = [string]$TSEnv.Value("OSDDomain")
             if (-not [string]::IsNullOrWhiteSpace($d)) { return $d }
-        } catch { }
+        } catch { Write-OSDLogOnce 'domain-ts' ("Could not read task sequence domain: {0}" -f $_) }
     }
     # 3. Real domain membership (full Windows, once joined)
     try {
-        $cs = Get-WmiObject Win32_ComputerSystem -ErrorAction SilentlyContinue
+        $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
         if ($cs -and $cs.PartOfDomain -and $cs.Domain) { return [string]$cs.Domain }
-    } catch { }
+    } catch { Write-OSDLogOnce 'domain-membership' ("Could not read domain membership: {0}" -f $_) }
     # 4. DNS suffix received from DHCP (works in WinPE)
     try {
-        $dns = Get-WmiObject Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" -ErrorAction SilentlyContinue |
+        $dns = Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" -ErrorAction SilentlyContinue |
                ForEach-Object { $_.DNSDomain } | Where-Object { $_ } | Select-Object -First 1
         if ($dns) { return [string]$dns }
-    } catch { }
+    } catch { Write-OSDLogOnce 'domain-dns' ("Could not read DNS suffix: {0}" -f $_) }
     return $null
 }
 
 # Hardware info (read once)
-$SerialHW = (Get-WmiObject Win32_BIOS -ErrorAction SilentlyContinue).SerialNumber
-$ModelHW  = (Get-WmiObject Win32_ComputerSystem -ErrorAction SilentlyContinue).Model
-$BiosVer  = (Get-WmiObject Win32_BIOS -ErrorAction SilentlyContinue).SMBIOSBIOSVersion
-$MACAddr  = (Get-WmiObject Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" -ErrorAction SilentlyContinue | Select-Object -First 1).MACAddress
+$SerialHW = (Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue).SerialNumber
+$ModelHW  = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue).Model
+$BiosVer  = (Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue).SMBIOSBIOSVersion
+$MACAddr  = (Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" -ErrorAction SilentlyContinue | Select-Object -First 1).MACAddress
 
 $script:vPC     = [string]$env:COMPUTERNAME
 $script:vSerial = 'Unknown';      if ($SerialHW) { $script:vSerial = [string]$SerialHW }
@@ -541,7 +542,7 @@ try {
     if ($SavedStep -match '^\d+$' -and [int]$SavedStep -ge 1) {
         $script:CurrentStepMax = [int]$SavedStep
     }
-} catch { }
+} catch { Write-Debug ("Could not restore task sequence step: {0}" -f $_) }
 
 # Keywords: string ("A|B", "A;B", "A,B") or JSON array, case-insensitive, no regex
 function Test-StepMatch {
@@ -570,7 +571,7 @@ function Get-StatusTitle {
 # ==============================================================================
 # PAINT SECTIONS
 # ==============================================================================
-function Paint-Header {
+function Write-Header {
     param($g, $L)
     $s = $L.s
     $x = $L.cl + 6 * $s
@@ -587,10 +588,10 @@ function Paint-Header {
         $g.FillPath($lg, $p)
         $p.Dispose()
         $lg.Dispose()
-        Draw-Text $g 'S' (Get-Fnt 'Segoe UI' (36 * $s) $true) $BrWhite $x (62 * $s) $bs 'C'
+        Write-Text $g 'S' (Get-Fnt 'Segoe UI' (36 * $s) $true) $BrWhite $x (62 * $s) $bs 'C'
         $tx = $x + $bs + 18 * $s
-        Draw-Text $g $CompanyName (Get-Fnt 'Segoe UI' (34 * $s) $true) $BrText $tx (47 * $s) (700 * $s) 'L'
-        Draw-Spaced $g $DeptName (Get-Fnt 'Segoe UI' (15 * $s) $false) $BrDim $tx (81 * $s) (5 * $s)
+        Write-Text $g $CompanyName (Get-Fnt 'Segoe UI' (34 * $s) $true) $BrText $tx (47 * $s) (700 * $s) 'L'
+        Write-SpacedText $g $DeptName (Get-Fnt 'Segoe UI' (15 * $s) $false) $BrDim $tx (81 * $s) (5 * $s)
     }
 
     # Align the status dot with the sidebar timeline markers.
@@ -605,20 +606,20 @@ function Paint-Header {
     $px = $L.sbX + (71 - 30) * $s
     $py = 36 * $s
     $b  = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(34, $pc))
-    Fill-RR $g $b $px $py $pw $ph ($ph / 2)
+    Write-RoundedRectangleFill $g $b $px $py $pw $ph ($ph / 2)
     $b.Dispose()
     $pen = New-PenS ([System.Drawing.Color]::FromArgb(150, $pc)) (1.6 * $s)
-    Draw-RR $g $pen $px $py $pw $ph ($ph / 2)
+    Write-RoundedRectangle $g $pen $px $py $pw $ph ($ph / 2)
     $pen.Dispose()
     $da = 255
     if ($script:Pulse -eq 1) { $da = 150 }
     $db = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($da, $pc))
-    Fill-Circle $g $db ($px + 30 * $s) ($py + $ph / 2) (8.5 * $s)
+    Write-CircleFill $g $db ($px + 30 * $s) ($py + $ph / 2) (8.5 * $s)
     $db.Dispose()
-    Draw-Spaced $g $script:PillText $f $BrText ($px + 54 * $s) ($py + $ph / 2) (1.4 * $s)
+    Write-SpacedText $g $script:PillText $f $BrText ($px + 54 * $s) ($py + $ph / 2) (1.4 * $s)
 }
 
-function Paint-Hero {
+function Write-Hero {
     param($g, $L)
     $s  = $L.s
     $x0 = $L.cl
@@ -629,19 +630,19 @@ function Paint-Hero {
     $fPct = Get-Fnt $BigFontName (94 * $s) $false
     $num  = [string][int]$script:PctValue
     $nw   = $g.MeasureString($num, $fBig, 3000, $SfMeasure).Width
-    Draw-Text $g $num $fBig $BrText $x0 ($y0 + 90.5 * $s) 3000 'L'
-    Draw-Text $g '%' $fPct $BrDim ($x0 + $nw + 8 * $s) ($y0 + 126 * $s) 600 'L'
-    Draw-Spaced $g 'APPROXIMATE PROGRESS' (Get-Fnt 'Segoe UI' (17 * $s) $false) $BrDim ($x0 + 44 * $s) ($y0 + 196 * $s) (4.6 * $s)
+    Write-Text $g $num $fBig $BrText $x0 ($y0 + 90.5 * $s) 3000 'L'
+    Write-Text $g '%' $fPct $BrDim ($x0 + $nw + 8 * $s) ($y0 + 126 * $s) 600 'L'
+    Write-SpacedText $g 'APPROXIMATE PROGRESS' (Get-Fnt 'Segoe UI' (17 * $s) $false) $BrDim ($x0 + 44 * $s) ($y0 + 196 * $s) (4.6 * $s)
 
     # Vertical divider
-    Draw-Line $g $script:Pens.sepV ($x0 + 403 * $s) ($y0 + 3 * $s) ($x0 + 403 * $s) ($y0 + 237 * $s)
+    Write-Line $g $script:Pens.sepV ($x0 + 403 * $s) ($y0 + 3 * $s) ($x0 + 403 * $s) ($y0 + 237 * $s)
 
     # Headline
     $hx = $x0 + 460 * $s
     $fH = Get-Fnt 'Segoe UI' (62 * $s) $true
-    if ($HeadLines.Count -ge 1) { Draw-Text $g ([string]$HeadLines[0]) $fH $BrText $hx ($y0 + 32 * $s) 2000 'L' }
-    if ($HeadLines.Count -ge 2) { Draw-Text $g ([string]$HeadLines[1]) $fH $BrText $hx ($y0 + 92 * $s) 2000 'L' }
-    Draw-Text $g $OsName (Get-Fnt 'Segoe UI' (30 * $s) $false) $BrBlueText $hx ($y0 + 145 * $s) 2000 'L'
+    if ($HeadLines.Count -ge 1) { Write-Text $g ([string]$HeadLines[0]) $fH $BrText $hx ($y0 + 32 * $s) 2000 'L' }
+    if ($HeadLines.Count -ge 2) { Write-Text $g ([string]$HeadLines[1]) $fH $BrText $hx ($y0 + 92 * $s) 2000 'L' }
+    Write-Text $g $OsName (Get-Fnt 'Segoe UI' (30 * $s) $false) $BrBlueText $hx ($y0 + 145 * $s) 2000 'L'
 
     # Status line
     $sc = $ColAccent
@@ -650,15 +651,15 @@ function Paint-Hero {
     $da = 255
     if ($script:Pulse -eq 1) { $da = 140 }
     $db = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($da, $sc))
-    Fill-Circle $g $db ($hx + 12 * $s) ($y0 + 199 * $s) (10 * $s)
+    Write-CircleFill $g $db ($hx + 12 * $s) ($y0 + 199 * $s) (10 * $s)
     $db.Dispose()
-    Draw-Text $g (Get-StatusTitle) (Get-Fnt 'Segoe UI' (25 * $s) $false) $BrText ($hx + 44 * $s) ($y0 + 199 * $s) 2000 'L'
+    Write-Text $g (Get-StatusTitle) (Get-Fnt 'Segoe UI' (25 * $s) $false) $BrText ($hx + 44 * $s) ($y0 + 199 * $s) 2000 'L'
     $act = [string]$script:CurrentActionText
     if ([string]::IsNullOrWhiteSpace($act)) { $act = 'Waiting for the task sequence...' }
-    Draw-Text $g $act (Get-Fnt 'Segoe UI' (21 * $s) $false) $BrDim ($hx + 44 * $s) ($y0 + 229 * $s) 2000 'L'
+    Write-Text $g $act (Get-Fnt 'Segoe UI' (21 * $s) $false) $BrDim ($hx + 44 * $s) ($y0 + 229 * $s) 2000 'L'
 }
 
-function Paint-Bar {
+function Write-ProgressBar {
     param($g, $L)
     $s  = $L.s
     $x0 = $L.cl
@@ -677,8 +678,8 @@ function Paint-Bar {
     for ($i = 0; $i -lt $n; $i++) {
         $x  = $x0 + $i * ($segW + $gap)
         $id = [int]$PhaseList[$i].Id
-        Fill-RR $g $BrTrack $x $by $segW $bh ($bh / 2)
-        Draw-RR $g $script:Pens.trackBorder $x $by $segW $bh ($bh / 2)
+        Write-RoundedRectangleFill $g $BrTrack $x $by $segW $bh ($bh / 2)
+        Write-RoundedRectangle $g $script:Pens.trackBorder $x $by $segW $bh ($bh / 2)
         $lb = $BrDim
 
         if ($id -lt $cur) {
@@ -690,15 +691,15 @@ function Paint-Bar {
             $gr.Dispose()
             $ccx = $x + $segW / 2
             $ccy = $by + $bh / 2
-            Draw-Line $g $script:Pens.checkSmall ($ccx - 8 * $s) ($ccy + 0.5 * $s) ($ccx - 3 * $s) ($ccy + 5.5 * $s)
-            Draw-Line $g $script:Pens.checkSmall ($ccx - 3 * $s) ($ccy + 5.5 * $s) ($ccx + 8 * $s) ($ccy - 5.5 * $s)
+            Write-Line $g $script:Pens.checkSmall ($ccx - 8 * $s) ($ccy + 0.5 * $s) ($ccx - 3 * $s) ($ccy + 5.5 * $s)
+            Write-Line $g $script:Pens.checkSmall ($ccx - 3 * $s) ($ccy + 5.5 * $s) ($ccx + 8 * $s) ($ccy - 5.5 * $s)
         }
         elseif ($id -eq $cur) {
             $frac = ($script:PctValue - $i * $share) / $share
             $frac = [Math]::Max(0.12, [Math]::Min(0.92, $frac))
             $fw   = $segW * $frac
             $gb   = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(40, $ColAccent))
-            Fill-RR $g $gb ($x - 3 * $s) ($by - 3 * $s) ($fw + 6 * $s) ($bh + 6 * $s) (($bh + 6 * $s) / 2)
+            Write-RoundedRectangleFill $g $gb ($x - 3 * $s) ($by - 3 * $s) ($fw + 6 * $s) ($bh + 6 * $s) (($bh + 6 * $s) / 2)
             $gb.Dispose()
             $rc = New-RectF $x $by $fw $bh
             $gr = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rc, $ColAccent, $ColBlue, [single]0)
@@ -711,32 +712,32 @@ function Paint-Bar {
 
         $lbl = [string]$PhaseList[$i].Name
         if ($PhaseList[$i].ShortName) { $lbl = [string]$PhaseList[$i].ShortName }
-        Draw-Text $g $lbl $fLab $lb $x ($by + $bh + 22 * $s) $segW 'C'
+        Write-Text $g $lbl $fLab $lb $x ($by + $bh + 22 * $s) $segW 'C'
     }
 
     $fCap = Get-Fnt 'Segoe UI' (18 * $s) $false
-    Draw-Text $g $script:StepCaption $fCap $BrDim ($x0 + 3 * $s) ($y0 + 356 * $s) 600 'L'
-    Draw-Text $g $script:RemainText $fCap $BrDim $x0 ($y0 + 356 * $s) $cw 'R'
+    Write-Text $g $script:StepCaption $fCap $BrDim ($x0 + 3 * $s) ($y0 + 356 * $s) 600 'L'
+    Write-Text $g $script:RemainText $fCap $BrDim $x0 ($y0 + 356 * $s) $cw 'R'
 }
 
-function Paint-CardFrame {
+function Write-CardFrame {
     param($g, $L, $X, $Y, $W, $H, [string]$Icon, [string]$Title, [string]$Sub)
     $s = $L.s
-    Fill-RR $g $BrCardFill $X $Y $W $H (16 * $s)
-    Draw-RR $g $script:Pens.border $X $Y $W $H (16 * $s)
+    Write-RoundedRectangleFill $g $BrCardFill $X $Y $W $H (16 * $s)
+    Write-RoundedRectangle $g $script:Pens.border $X $Y $W $H (16 * $s)
     $ix = $X + 33 * $s
     $iy = $Y + 24 * $s
     switch ($Icon) {
-        'laptop'  { Draw-IconLaptop  $g $ix $iy $s }
-        'network' { Draw-IconNetwork $g $ix $iy $s }
-        'clock'   { Draw-IconClock   $g $ix $iy $s }
+        'laptop'  { Write-LaptopIcon  $g $ix $iy $s }
+        'network' { Write-NetworkIcon $g $ix $iy $s }
+        'clock'   { Write-ClockIcon   $g $ix $iy $s }
     }
-    Draw-Text $g $Title (Get-Fnt 'Segoe UI' (21 * $s) $true) $BrText ($X + 120 * $s) ($Y + 39 * $s) (300 * $s) 'L'
-    Draw-Text $g $Sub (Get-Fnt 'Segoe UI' (17 * $s) $false) $BrDim ($X + 120 * $s) ($Y + 66 * $s) ($W - 130 * $s) 'L'
-    Draw-Line $g $script:Pens.sep ($X + 22 * $s) ($Y + 97 * $s) ($X + $W - 22 * $s) ($Y + 97 * $s)
+    Write-Text $g $Title (Get-Fnt 'Segoe UI' (21 * $s) $true) $BrText ($X + 120 * $s) ($Y + 39 * $s) (300 * $s) 'L'
+    Write-Text $g $Sub (Get-Fnt 'Segoe UI' (17 * $s) $false) $BrDim ($X + 120 * $s) ($Y + 66 * $s) ($W - 130 * $s) 'L'
+    Write-Line $g $script:Pens.sep ($X + 22 * $s) ($Y + 97 * $s) ($X + $W - 22 * $s) ($Y + 97 * $s)
 }
 
-function Paint-Rows {
+function Write-DataRows {
     param($g, $L, $X, $Y, $W, $Rows)
     $s    = $L.s
     $fLab = Get-Fnt 'Segoe UI' (18 * $s) $false
@@ -746,15 +747,15 @@ function Paint-Rows {
         $cy  = $Y + (122 + 49 * $i) * $s
         $lab = [string]$Rows[$i].L
         $val = [string]$Rows[$i].V
-        Draw-Text $g $lab $fLab $BrLabel ($X + 26 * $s) $cy (124 * $s) 'L'
-        Draw-Text $g $val $fVal $BrText ($X + 150 * $s) $cy ($W - 166 * $s) 'L'
+        Write-Text $g $lab $fLab $BrLabel ($X + 26 * $s) $cy (124 * $s) 'L'
+        Write-Text $g $val $fVal $BrText ($X + 150 * $s) $cy ($W - 166 * $s) 'L'
         if ($i -lt ($n - 1)) {
-            Draw-Line $g $script:Pens.sep ($X + 22 * $s) ($cy + 24.5 * $s) ($X + $W - 22 * $s) ($cy + 24.5 * $s)
+            Write-Line $g $script:Pens.sep ($X + 22 * $s) ($cy + 24.5 * $s) ($X + $W - 22 * $s) ($cy + 24.5 * $s)
         }
     }
 }
 
-function Paint-Cards {
+function Write-Cards {
     param($g, $L)
     $s    = $L.s
     $gap  = 16 * $s
@@ -766,23 +767,23 @@ function Paint-Cards {
     $x3   = $x2 + $cw3 + $gap
 
     # DEVICE
-    Paint-CardFrame $g $L $x1 $y $cw3 $h 'laptop' 'DEVICE' 'Hardware information'
+    Write-CardFrame $g $L $x1 $y $cw3 $h 'laptop' 'DEVICE' 'Hardware information'
     $devRows = @(
         @{ L = 'Computer name'; V = $script:vPC },
         @{ L = 'Model';         V = $script:vModel },
         @{ L = 'Serial number'; V = $script:vSerial },
         @{ L = 'BIOS version';  V = $script:vBios }
     )
-    Paint-Rows $g $L $x1 $y $cw3 $devRows
+    Write-DataRows $g $L $x1 $y $cw3 $devRows
 
     # NETWORK
-    Paint-CardFrame $g $L $x2 $y $cw3 $h 'network' 'NETWORK' 'Connectivity details'
+    Write-CardFrame $g $L $x2 $y $cw3 $h 'network' 'NETWORK' 'Connectivity details'
     $netRows = @(
         @{ L = 'Domain';      V = $script:vDomain },
         @{ L = 'IP address';  V = $script:vIP },
         @{ L = 'MAC address'; V = $script:vMac }
     )
-    Paint-Rows $g $L $x2 $y $cw3 $netRows
+    Write-DataRows $g $L $x2 $y $cw3 $netRows
     $ntxt = 'Waiting for network'
     $ncol = $ColAmber
     if ($script:CachedIP) { $ntxt = 'Connected'; $ncol = $ColGreen }
@@ -792,23 +793,23 @@ function Paint-Cards {
     $npy   = $y + 254 * $s
     $nph   = 43 * $s
     $nb    = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(45, $ncol))
-    Fill-RR $g $nb ($x2 + 24 * $s) $npy $npw $nph ($nph / 2)
+    Write-RoundedRectangleFill $g $nb ($x2 + 24 * $s) $npy $npw $nph ($nph / 2)
     $nb.Dispose()
     $npen = New-PenS ([System.Drawing.Color]::FromArgb(170, $ncol)) (1.5 * $s)
-    Draw-RR $g $npen ($x2 + 24 * $s) $npy $npw $nph ($nph / 2)
+    Write-RoundedRectangle $g $npen ($x2 + 24 * $s) $npy $npw $nph ($nph / 2)
     $npen.Dispose()
     $nd = New-Object System.Drawing.SolidBrush($ncol)
-    Fill-Circle $g $nd ($x2 + 24 * $s + 25 * $s) ($npy + $nph / 2) (8 * $s)
-    Draw-Text $g $ntxt $fPill $nd ($x2 + 24 * $s + 46 * $s) ($npy + $nph / 2) ($npw - 50 * $s) 'L'
+    Write-CircleFill $g $nd ($x2 + 24 * $s + 25 * $s) ($npy + $nph / 2) (8 * $s)
+    Write-Text $g $ntxt $fPill $nd ($x2 + 24 * $s + 46 * $s) ($npy + $nph / 2) ($npw - 50 * $s) 'L'
     $nd.Dispose()
 
     # STATUS
-    Paint-CardFrame $g $L $x3 $y $cw3 $h 'clock' 'STATUS' 'Deployment progress'
-    Draw-Text $g ([string]$script:StatTimer) (Get-Fnt 'Segoe UI' (54 * $s) $true) $BrAccent ($x3 + 30 * $s) ($y + 123 * $s) ($cw3 - 40 * $s) 'L'
-    Draw-Text $g 'Time elapsed' (Get-Fnt 'Segoe UI' (19 * $s) $false) $BrLabel ($x3 + 30 * $s) ($y + 163 * $s) (300 * $s) 'L'
-    Draw-Line $g $script:Pens.sep ($x3 + 22 * $s) ($y + 195 * $s) ($x3 + $cw3 - 22 * $s) ($y + 195 * $s)
-    Draw-Text $g ([string]$script:StatState) (Get-Fnt 'Segoe UI' (19 * $s) $false) $BrText ($x3 + 30 * $s) ($y + 220 * $s) ($cw3 - 60 * $s) 'L'
-    Draw-Text $g ([string]$script:StatStep) (Get-Fnt 'Segoe UI' (17 * $s) $false) $BrDim ($x3 + 30 * $s) ($y + 220 * $s) ($cw3 - 60 * $s) 'R'
+    Write-CardFrame $g $L $x3 $y $cw3 $h 'clock' 'STATUS' 'Deployment progress'
+    Write-Text $g ([string]$script:StatTimer) (Get-Fnt 'Segoe UI' (54 * $s) $true) $BrAccent ($x3 + 30 * $s) ($y + 123 * $s) ($cw3 - 40 * $s) 'L'
+    Write-Text $g 'Time elapsed' (Get-Fnt 'Segoe UI' (19 * $s) $false) $BrLabel ($x3 + 30 * $s) ($y + 163 * $s) (300 * $s) 'L'
+    Write-Line $g $script:Pens.sep ($x3 + 22 * $s) ($y + 195 * $s) ($x3 + $cw3 - 22 * $s) ($y + 195 * $s)
+    Write-Text $g ([string]$script:StatState) (Get-Fnt 'Segoe UI' (19 * $s) $false) $BrText ($x3 + 30 * $s) ($y + 220 * $s) ($cw3 - 60 * $s) 'L'
+    Write-Text $g ([string]$script:StatStep) (Get-Fnt 'Segoe UI' (17 * $s) $false) $BrDim ($x3 + 30 * $s) ($y + 220 * $s) ($cw3 - 60 * $s) 'R'
 
     # Activity bars (filled according to the overall progress)
     $nbars  = 18
@@ -820,19 +821,19 @@ function Paint-Cards {
         $bx = $x3 + 30 * $s + $i * $pitch + ($pitch - $bw) / 2
         $br = $BrBarOff
         if ($i -lt $filled) { $br = $BrAccent }
-        Fill-RR $g $br $bx ($y + 253 * $s) $bw (28 * $s) (2.5 * $s)
+        Write-RoundedRectangleFill $g $br $bx ($y + 253 * $s) $bw (28 * $s) (2.5 * $s)
     }
 }
 
-function Paint-Sidebar {
+function Write-Sidebar {
     param($g, $L)
     $s     = $L.s
     $sbX   = $L.sbX
     $y0    = $L.y0
     $right = $L.W
     $tx    = $sbX + 47 * $s
-    Draw-Spaced $g 'INSTALLATION STEPS' (Get-Fnt 'Segoe UI' (21 * $s) $false) $BrText $tx $y0 (1.2 * $s)
-    Draw-Text $g 'Your device is being configured.' (Get-Fnt 'Segoe UI' (19 * $s) $false) $BrDim $tx ($y0 + 32 * $s) (380 * $s) 'L'
+    Write-SpacedText $g 'INSTALLATION STEPS' (Get-Fnt 'Segoe UI' (21 * $s) $false) $BrText $tx $y0 (1.2 * $s)
+    Write-Text $g 'Your device is being configured.' (Get-Fnt 'Segoe UI' (19 * $s) $false) $BrDim $tx ($y0 + 32 * $s) (380 * $s) 'L'
 
     $n        = $PhaseList.Count
     $ny0      = $y0 + 95 * $s
@@ -856,8 +857,8 @@ function Paint-Sidebar {
             $ny = $ny0 + $i * $pitch
             $hx = $sbX + 28 * $s
             $hw = ($right - 27 * $s) - $hx
-            Fill-RR $g $BrHighlight $hx ($ny - 41 * $s) $hw (96 * $s) (14 * $s)
-            Draw-RR $g $script:Pens.hiBorder $hx ($ny - 41 * $s) $hw (96 * $s) (14 * $s)
+            Write-RoundedRectangleFill $g $BrHighlight $hx ($ny - 41 * $s) $hw (96 * $s) (14 * $s)
+            Write-RoundedRectangle $g $script:Pens.hiBorder $hx ($ny - 41 * $s) $hw (96 * $s) (14 * $s)
         }
     }
 
@@ -867,7 +868,7 @@ function Paint-Sidebar {
         $yb  = $ny0 + ($i + 1) * $pitch - $rNode
         $pen = $script:Pens.grayLine
         if ([int]$PhaseList[$i + 1].Id -le $cur) { $pen = $script:Pens.greenLine }
-        Draw-Line $g $pen $nx $ya $nx $yb
+        Write-Line $g $pen $nx $ya $nx $yb
     }
 
     # Nodes + texts
@@ -876,29 +877,29 @@ function Paint-Sidebar {
         $id = [int]$st.Id
         $ny = $ny0 + $i * $pitch
         if ($id -lt $cur) {
-            Fill-Circle $g $BrGreen $nx $ny $rNode
-            Draw-Line $g $script:Pens.check ($nx - 7 * $s) ($ny + 0.5 * $s) ($nx - 2 * $s) ($ny + 5.5 * $s)
-            Draw-Line $g $script:Pens.check ($nx - 2 * $s) ($ny + 5.5 * $s) ($nx + 7.5 * $s) ($ny - 5 * $s)
+            Write-CircleFill $g $BrGreen $nx $ny $rNode
+            Write-Line $g $script:Pens.check ($nx - 7 * $s) ($ny + 0.5 * $s) ($nx - 2 * $s) ($ny + 5.5 * $s)
+            Write-Line $g $script:Pens.check ($nx - 2 * $s) ($ny + 5.5 * $s) ($nx + 7.5 * $s) ($ny - 5 * $s)
             $desc = Get-StepText $st 'DoneText' $DefaultDone
         }
         elseif ($id -eq $cur) {
             $ga = 45
             if ($script:Pulse -eq 1) { $ga = 20 }
             $gb = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($ga, $ColAccent))
-            Fill-Circle $g $gb $nx $ny (27 * $s)
+            Write-CircleFill $g $gb $nx $ny (27 * $s)
             $gb.Dispose()
-            Fill-Circle $g $BrNodeFill $nx $ny $rNode
-            Draw-Circle $g $script:Pens.ringCyan $nx $ny $rNode
-            Fill-Circle $g $BrAccent $nx $ny (8 * $s)
+            Write-CircleFill $g $BrNodeFill $nx $ny $rNode
+            Write-Circle $g $script:Pens.ringCyan $nx $ny $rNode
+            Write-CircleFill $g $BrAccent $nx $ny (8 * $s)
             $desc = Get-StepText $st 'Description' $DefaultDesc
         }
         else {
-            Fill-Circle $g $BrNodeFill $nx $ny $rNode
-            Draw-Circle $g $script:Pens.ringGray $nx $ny $rNode
+            Write-CircleFill $g $BrNodeFill $nx $ny $rNode
+            Write-Circle $g $script:Pens.ringGray $nx $ny $rNode
             $desc = Get-StepText $st 'Description' $DefaultDesc
         }
-        Draw-Text $g (Get-StepTitle $st) $fTit $BrText $tx2 ($ny - 5 * $s) $textW 'L'
-        Draw-Text $g $desc $fDes $BrDim $tx2 ($ny + 24 * $s) $textW 'L'
+        Write-Text $g (Get-StepTitle $st) $fTit $BrText $tx2 ($ny - 5 * $s) $textW 'L'
+        Write-Text $g $desc $fDes $BrDim $tx2 ($ny + 24 * $s) $textW 'L'
     }
 
     # "Automatic restart" inset (bottom aligned with the cards)
@@ -906,44 +907,44 @@ function Paint-Sidebar {
     $iw = ($right - 34 * $s) - $ix
     $ih = 97 * $s
     $iy = $insetTop
-    Fill-RR $g $BrInset $ix $iy $iw $ih (16 * $s)
-    Draw-RR $g $script:Pens.border $ix $iy $iw $ih (16 * $s)
+    Write-RoundedRectangleFill $g $BrInset $ix $iy $iw $ih (16 * $s)
+    Write-RoundedRectangle $g $script:Pens.border $ix $iy $iw $ih (16 * $s)
     $icx = $ix + 52 * $s
     $icy = $iy + $ih / 2
-    Fill-Circle $g $BrNodeFill $icx $icy (27 * $s)
-    Draw-Circle $g $script:Pens.ringGray $icx $icy (27 * $s)
-    Draw-IconRestart $g $icx $icy $s
-    Draw-Text $g 'Automatic restart' (Get-Fnt 'Segoe UI' (21 * $s) $true) $BrText ($ix + 100 * $s) ($iy + 36 * $s) ($iw - 112 * $s) 'L'
-    Draw-Text $g 'Your device may restart several times.' (Get-Fnt 'Segoe UI' (15 * $s) $false) $BrDim ($ix + 100 * $s) ($iy + 65 * $s) ($iw - 112 * $s) 'L'
+    Write-CircleFill $g $BrNodeFill $icx $icy (27 * $s)
+    Write-Circle $g $script:Pens.ringGray $icx $icy (27 * $s)
+    Write-RestartIcon $g $icx $icy $s
+    Write-Text $g 'Automatic restart' (Get-Fnt 'Segoe UI' (21 * $s) $true) $BrText ($ix + 100 * $s) ($iy + 36 * $s) ($iw - 112 * $s) 'L'
+    Write-Text $g 'Your device may restart several times.' (Get-Fnt 'Segoe UI' (15 * $s) $false) $BrDim ($ix + 100 * $s) ($iy + 65 * $s) ($iw - 112 * $s) 'L'
 }
 
-function Paint-Info {
+function Write-InfoBar {
     param($g, $L)
     $s   = $L.s
     $x   = $L.cl
     $wid = ($L.W - 34 * $s) - $x
     $hgt = 66 * $s
     $y   = $L.H - 156 * $s
-    Fill-RR $g $BrInfo $x $y $wid $hgt (16 * $s)
-    Draw-RR $g $script:Pens.infoBorder $x $y $wid $hgt (16 * $s)
+    Write-RoundedRectangleFill $g $BrInfo $x $y $wid $hgt (16 * $s)
+    Write-RoundedRectangle $g $script:Pens.infoBorder $x $y $wid $hgt (16 * $s)
     $icx = $x + 42 * $s
     $icy = $y + $hgt / 2
-    Draw-Circle $g $script:Pens.icon2 $icx $icy (17 * $s)
-    Fill-Circle $g $BrAccent $icx ($icy - 7 * $s) (2.2 * $s)
-    Draw-Line $g $script:Pens.icon2 $icx ($icy - 2 * $s) $icx ($icy + 8 * $s)
-    Draw-Line $g $script:Pens.sep ($x + 84 * $s) ($y + 16 * $s) ($x + 84 * $s) ($y + $hgt - 16 * $s)
-    Draw-Text $g $InfoMessage (Get-Fnt 'Segoe UI' (22 * $s) $false) $BrText ($x + 106 * $s) $icy ($wid - 130 * $s) 'L'
+    Write-Circle $g $script:Pens.icon2 $icx $icy (17 * $s)
+    Write-CircleFill $g $BrAccent $icx ($icy - 7 * $s) (2.2 * $s)
+    Write-Line $g $script:Pens.icon2 $icx ($icy - 2 * $s) $icx ($icy + 8 * $s)
+    Write-Line $g $script:Pens.sep ($x + 84 * $s) ($y + 16 * $s) ($x + 84 * $s) ($y + $hgt - 16 * $s)
+    Write-Text $g $InfoMessage (Get-Fnt 'Segoe UI' (22 * $s) $false) $BrText ($x + 106 * $s) $icy ($wid - 130 * $s) 'L'
 }
 
-function Paint-Footer {
+function Write-Footer {
     param($g, $L)
     $s  = $L.s
     $x  = $L.cl + 6 * $s
     $cy = $L.H - 38 * $s
-    Draw-IconHeadset $g $x ($cy - 15 * $s) $s
-    Draw-Text $g $SupportTitle (Get-Fnt 'Segoe UI' (18 * $s) $false) $BrText ($x + 50 * $s) ($L.H - 47 * $s) (700 * $s) 'L'
-    Draw-Text $g $SupportText (Get-Fnt 'Segoe UI' (14.5 * $s) $false) $BrDim ($x + 50 * $s) ($L.H - 26 * $s) (800 * $s) 'L'
-    Draw-Text $g ("v{0}  -  Ctrl+Shift+D : Diagnostics" -f $AppVersion) (Get-Fnt 'Segoe UI' (16 * $s) $false) $BrDim 0 ($L.H - 37 * $s) ($L.W - 45 * $s) 'R'
+    Write-HeadsetIcon $g $x ($cy - 15 * $s) $s
+    Write-Text $g $SupportTitle (Get-Fnt 'Segoe UI' (18 * $s) $false) $BrText ($x + 50 * $s) ($L.H - 47 * $s) (700 * $s) 'L'
+    Write-Text $g $SupportText (Get-Fnt 'Segoe UI' (14.5 * $s) $false) $BrDim ($x + 50 * $s) ($L.H - 26 * $s) (800 * $s) 'L'
+    Write-Text $g ("v{0}  -  Ctrl+Shift+D : Diagnostics" -f $AppVersion) (Get-Fnt 'Segoe UI' (16 * $s) $false) $BrDim 0 ($L.H - 37 * $s) ($L.W - 45 * $s) 'R'
 }
 
 function New-PenSet {
@@ -986,11 +987,11 @@ $Form.Controls.Add($Canvas)
 $Canvas.Add_Resize({ $Canvas.Invalidate() })
 
 $Canvas.Add_Paint({
-    param($sender, $e)
+    param($paintSender, $e)
     $g = $e.Graphics
     try {
-        $cw = $sender.ClientSize.Width
-        $ch = $sender.ClientSize.Height
+        $cw = $paintSender.ClientSize.Width
+        $ch = $paintSender.ClientSize.Height
         if ($cw -lt 300 -or $ch -lt 300) { return }
         $g.SmoothingMode     = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
@@ -1004,20 +1005,20 @@ $Canvas.Add_Paint({
         $script:Pens = New-PenSet $L.s
 
         # Vertical separator between the main area and the sidebar
-        Draw-Line $g $script:Pens.sepV $L.sbX (24 * $L.s) $L.sbX ($ch - 74 * $L.s)
+        Write-Line $g $script:Pens.sepV $L.sbX (24 * $L.s) $L.sbX ($ch - 74 * $L.s)
 
-        foreach ($sec in @('Paint-Header', 'Paint-Hero', 'Paint-Bar', 'Paint-Cards', 'Paint-Sidebar', 'Paint-Info', 'Paint-Footer')) {
-            try { & $sec $g $L } catch { Write-LogOnce $sec ("{0}: {1}" -f $sec, $_) }
+        foreach ($sec in @('Write-Header', 'Write-Hero', 'Write-ProgressBar', 'Write-Cards', 'Write-Sidebar', 'Write-InfoBar', 'Write-Footer')) {
+            try { & $sec $g $L } catch { Write-OSDLogOnce $sec ("{0}: {1}" -f $sec, $_) }
         }
     } catch {
-        Write-LogOnce 'paint' "Paint canvas: $_"
+        Write-OSDLogOnce 'paint' "Paint canvas: $_"
     } finally {
-        foreach ($k in @($script:Pens.Keys)) { try { $script:Pens[$k].Dispose() } catch { } }
+        foreach ($k in @($script:Pens.Keys)) { try { $script:Pens[$k].Dispose() } catch { Write-Debug ("Could not dispose drawing pen '{0}': {1}" -f $k, $_) } }
         $script:Pens = @{}
     }
 })
 
-Write-Log ("START v{0} PS={1} Apartment={2} Dir={3} Steps={4} Win32Type={5} Is64Bit={6} User={7} Session={8} Font={9}" -f $AppVersion, $PSVersionTable.PSVersion, [Threading.Thread]::CurrentThread.GetApartmentState(), $ScriptDir, $SortedIds.Count, ($null -ne ('Win32Window' -as [type])), [Environment]::Is64BitProcess, [Environment]::UserName, (Get-Process -Id $PID).SessionId, $BigFontName)
+Write-OSDLog ("START v{0} PS={1} Apartment={2} Dir={3} Steps={4} Win32Type={5} Is64Bit={6} User={7} Session={8} Font={9}" -f $AppVersion, $PSVersionTable.PSVersion, [Threading.Thread]::CurrentThread.GetApartmentState(), $ScriptDir, $SortedIds.Count, ($null -ne ('Win32Window' -as [type])), [Environment]::Is64BitProcess, [Environment]::UserName, (Get-Process -Id $PID).SessionId, $BigFontName)
 
 # ==============================================================================
 # DYNAMIC REFRESH LOOP (EVERY 1 SECOND)
@@ -1029,7 +1030,7 @@ $UpdateUI = {
     $Elapsed = $Now - $StartTime
     if ($script:CloseAt -and (Get-Date) -ge $script:CloseAt) {
         $script:CloseAt = $null
-        Write-Log "Closing UI (deployment complete)"
+        Write-OSDLog "Closing UI (deployment complete)"
         $Form.Close()
     }
     $script:StatTimer = "{0:hh\:mm\:ss}" -f $Elapsed
@@ -1075,7 +1076,7 @@ $UpdateUI = {
     }
     $script:RemainText = $RemainText
 
-    } catch { Write-Log "Section 1 (timer): $_" }
+    } catch { Write-OSDLog "Section 1 (timer): $_" }
     try {
     # 2. Hide ConfigMgr "Installation Progress" window if enabled
     if ($Config.HideSCCMProgress -eq $true) {
@@ -1084,7 +1085,7 @@ $UpdateUI = {
             $ProcUI = Get-Process -Name "TsProgressUI" -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($ProcUI) {
                 $UiPath = $null
-                try { $UiPath = $ProcUI.Path } catch { }
+                try { $UiPath = $ProcUI.Path } catch { Write-OSDLogOnce 'progress-ui-path' ("Could not read TsProgressUI path: {0}" -f $_) }
                 if (-not $UiPath) {
                     foreach ($c in @("$env:SystemDrive\sms\bin\x64\TsProgressUI.exe", "$env:SystemRoot\CCM\TsProgressUI.exe")) {
                         if (Test-Path $c) { $UiPath = $c; break }
@@ -1093,7 +1094,7 @@ $UpdateUI = {
                 if ($UiPath) {
                     Start-Process -FilePath $UiPath -ArgumentList "/Unregister" -WindowStyle Hidden
                     $script:UIUnregistered = $true
-                    Write-Log "TsProgressUI /Unregister via $UiPath"
+                    Write-OSDLog "TsProgressUI /Unregister via $UiPath"
                 }
             }
         }
@@ -1103,13 +1104,13 @@ $UpdateUI = {
             $Hwnd = [Win32Window]::FindWindow([NullString]::Value, $WinTitle)
             if ($Hwnd -ne [IntPtr]::Zero -and [Win32Window]::ShowWindow($Hwnd, 0)) { $WasVisible = $true }
         }
-        Get-Process -Name "TsProgressUI" -ErrorAction SilentlyContinue | ForEach-Object {
-            if ($_.MainWindowHandle -ne [IntPtr]::Zero -and [Win32Window]::ShowWindow($_.MainWindowHandle, 0)) { $WasVisible = $true }
+        foreach ($progressProcess in @(Get-Process -Name "TsProgressUI" -ErrorAction SilentlyContinue)) {
+            if ($progressProcess.MainWindowHandle -ne [IntPtr]::Zero -and [Win32Window]::ShowWindow($progressProcess.MainWindowHandle, 0)) { $WasVisible = $true }
         }
         if ($WasVisible) { $Form.Refresh() }
     }
 
-    } catch { Write-Log "Section 2 (hide window): $_" }
+    } catch { Write-OSDLog "Section 2 (hide window): $_" }
     try {
     # 3. Connect to ConfigMgr Task Sequence Environment
     $TSEnv = $null
@@ -1123,7 +1124,7 @@ $UpdateUI = {
         $StepRaw       = $TSEnv.Value("_SMSTSNextInstructionPointer")
         $TotalRaw      = $TSEnv.Value("_SMSTSInstructionTableSize")
         if ([string]::IsNullOrWhiteSpace($TotalRaw)) { throw "TS variables are empty" }
-        if (-not $script:TSConnected) { Write-Log "TS environment connected" }
+        if (-not $script:TSConnected) { Write-OSDLog "TS environment connected" }
         $script:TSConnected = $true
         $script:TSFailCount = 0
         $script:StatusUnavailable = $false
@@ -1131,7 +1132,7 @@ $UpdateUI = {
         $ErrMsg = $_.Exception.Message
         if ($ErrMsg -ne $script:LastTSError) {
             $script:LastTSError = $ErrMsg
-            Write-Log "TS environment unavailable: $ErrMsg"
+            Write-OSDLog "TS environment unavailable: $ErrMsg"
         }
         # Transient failure: drop the object, retry on next tick
         $script:TSEnvObj = $null
@@ -1140,7 +1141,7 @@ $UpdateUI = {
         if ($script:TSConnected -and -not $script:Finished -and -not $script:Failed -and $script:TSFailCount -ge 20) {
             $script:StatusUnavailable = $true
             $script:CurrentActionText = 'Task sequence connection lost; status is unknown'
-            Write-LogOnce 'ts-lost' 'Task sequence connection lost; completion was not confirmed'
+            Write-OSDLogOnce 'ts-lost' 'Task sequence connection lost; completion was not confirmed'
         }
         if (-not $script:TSConnected) {
             $script:CurrentActionText = 'Preview mode - task sequence not detected'
@@ -1175,7 +1176,7 @@ $UpdateUI = {
             $script:PctValue = 100
             $script:CurrentActionText = 'Your device is ready'
             if ($AutoClose) { $script:CloseAt = (Get-Date).AddSeconds(5) }
-            Write-Log 'Task sequence signaled successful completion'
+            Write-OSDLog 'Task sequence signaled successful completion'
         } elseif ($DeploymentState -eq 'Failed' -and -not $script:Failed) {
             $script:Failed = $true
             $script:Finished = $false
@@ -1186,7 +1187,7 @@ $UpdateUI = {
             $script:CloseAt = $null
             if ($script:FailureAction) { $script:CurrentActionText = "Failed: $($script:FailureAction)" }
             else { $script:CurrentActionText = 'The task sequence reported a failure' }
-            Write-Log "Task sequence signaled failure: Action='$($script:FailureAction)' Code='$($script:FailureCode)'"
+            Write-OSDLog "Task sequence signaled failure: Action='$($script:FailureAction)' Code='$($script:FailureCode)'"
         }
 
         if (-not $script:Finished -and -not $script:Failed -and $StepRaw -match '^\d+$' -and $TotalRaw -match '^\d+$' -and [int]$TotalRaw -gt 0) {
@@ -1196,7 +1197,7 @@ $UpdateUI = {
 
         if (-not $script:Finished -and -not $script:Failed -and $CurrentAction -ne $script:LastAction) {
             $script:LastAction = $CurrentAction
-            Write-Log "Action='$CurrentAction' Progress=$StepRaw/$TotalRaw Step=$($script:CurrentStepMax)"
+            Write-OSDLog "Action='$CurrentAction' Progress=$StepRaw/$TotalRaw Step=$($script:CurrentStepMax)"
         }
 
         # Step detection (only moves forward, saved for the next reboot)
@@ -1209,16 +1210,16 @@ $UpdateUI = {
 
             if ($null -ne $Matched) {
                 $script:CurrentStepMax = [int]$Matched
-                try { $TSEnv.Value("TSBackgroundCurrentStep") = [string]$script:CurrentStepMax } catch { }
+                try { $TSEnv.Value("TSBackgroundCurrentStep") = [string]$script:CurrentStepMax } catch { Write-OSDLogOnce 'step-save' ("Could not save task sequence step: {0}" -f $_) }
             }
         }
     }
 
-    } catch { Write-Log "Section 3 (task sequence): $_" }
+    } catch { Write-OSDLog "Section 3 (task sequence): $_" }
     try {
     # 4. Reliable IPv4 detection across all active adapters + domain refresh
     if (-not $script:CachedIP) {
-        $IP = Get-WmiObject Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" -ErrorAction SilentlyContinue |
+        $IP = Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" -ErrorAction SilentlyContinue |
               ForEach-Object { $_.IPAddress } |
               Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' -and $_ -notlike '169.254.*' -and $_ -ne '127.0.0.1' } |
               Select-Object -First 1
@@ -1234,7 +1235,7 @@ $UpdateUI = {
         if ($DomNow) { $script:vDomain = [string]$DomNow }
     }
 
-    } catch { Write-Log "Section 4 (IP/domain): $_" }
+    } catch { Write-OSDLog "Section 4 (IP/domain): $_" }
     try {
     # 5. Texts derived from the state, then repaint the surface
     $nSteps = $SortedIds.Count
@@ -1264,7 +1265,7 @@ $UpdateUI = {
         $script:PillText  = $PillRunning
     }
     $Canvas.Invalidate()
-    } catch { Write-Log "Section 5 (repaint): $_" }
+    } catch { Write-OSDLog "Section 5 (repaint): $_" }
 }
 
 & $UpdateUI
@@ -1274,7 +1275,7 @@ $Timer.Interval = 1000
 $Timer.Add_Tick($UpdateUI)
 
 $Form.Add_KeyDown({
-    param($sender, $e)
+    param($keySender, $e)
     if ($e.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
         $Form.Close()
     }
