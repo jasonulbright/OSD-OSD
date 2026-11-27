@@ -54,8 +54,6 @@ Do not commit `config.json` when it contains organization-specific values. The e
 | `tools/Exit-OSDBackgroundWithOriginalCode.ps1` | Returns the saved task sequence failure code. |
 | `render/osd-osdv2-preview.png` | Rendered v2 sample with synthetic data. |
 | `render/osd-osdv2-preview.svg` | Editable source for the static render. |
-| `render/osd-osdv2-preview-left-aligned.png` | Alternate render with the status pill aligned to the sidebar heading. |
-| `render/osd-osdv2-preview-left-aligned.svg` | Editable source for the alternate render. |
 
 ## Task sequence state
 

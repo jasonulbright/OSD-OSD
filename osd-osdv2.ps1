@@ -593,7 +593,7 @@ function Paint-Header {
         Draw-Spaced $g $DeptName (Get-Fnt 'Segoe UI' (15 * $s) $false) $BrDim $tx (81 * $s) (5 * $s)
     }
 
-    # Center the status pill within the sidebar.
+    # Align the status dot with the sidebar timeline markers.
     $pc = $ColAccent
     if ($script:Failed) { $pc = [System.Drawing.Color]::FromArgb(239, 68, 68) }
     elseif ($script:StatusUnavailable) { $pc = [System.Drawing.Color]::FromArgb(245, 158, 11) }
@@ -602,7 +602,7 @@ function Paint-Header {
     $tw = Get-SpacedWidth $g $script:PillText $f (1.4 * $s)
     $pw = $tw + 76 * $s
     $ph = 44 * $s
-    $px = $L.sbX + (($L.W - $L.sbX - $pw) / 2)
+    $px = $L.sbX + (71 - 30) * $s
     $py = 36 * $s
     $b  = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(34, $pc))
     Fill-RR $g $b $px $py $pw $ph ($ph / 2)
