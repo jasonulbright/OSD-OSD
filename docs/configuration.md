@@ -2,7 +2,7 @@
 
 `osd-osdv2.ps1` reads JSON from `config.json` beside the script by default. Use `-ConfigFile` to select another JSON filename. Relative filenames resolve from the script folder.
 
-Start from `config.example.json`. The example includes `PreviewPercent` and `PreviewStep`. These values appear only when the script cannot connect to a task sequence. The script still reads real device and network information in this mode. Use the static preview image for synthetic data.
+Start from `config.example.json`. The example includes `PreviewPercent` and `PreviewStep`. These values appear only when the script cannot connect to a task sequence. The script still reads real device and network information in this mode. Do not use live preview mode in a shared or recorded demonstration. Use the static preview image for synthetic data.
 
 ## Display text
 

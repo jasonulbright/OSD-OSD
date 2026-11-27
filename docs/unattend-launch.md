@@ -51,6 +51,8 @@ The **Apply Windows Settings** step can overwrite answer file values that it man
 
 The `Path` command starts a separate process so the command can return to Windows Setup. `RunSynchronousCommand` itself runs in the system context during specialize and waits for the command to exit. This does not prove that the form appears in the technician's interactive desktop. Check the process session and visible window during the lab pilot.
 
+OSD-OSD allows only one process across Windows sessions. If the specialize process stays open in a session that the technician cannot see, it can prevent a later launch from opening. The pilot must confirm that the early process is visible or exits before a later launch step. If neither condition is true, remove the specialize entry and use the normal full Windows launch.
+
 If the display is not visible, remove this unattend entry and use the task-sequence launch step after **Setup Windows and ConfigMgr**. Do not use a custom `SetupComplete.cmd`; ConfigMgr uses that file to resume the task sequence.
 
 ## Validate the answer file merge

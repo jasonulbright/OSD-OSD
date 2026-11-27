@@ -1,20 +1,22 @@
 # OSD-OSD
 
-OSD-OSD means On Screen Display of Operating System Deployments. Version 2 is a Windows PowerShell display for ConfigMgr operating system task sequences. It shows task sequence activity, an overall progress value, device details, elapsed time, a step timeline, and deployment status cards.
+OSD-OSD means On Screen Display of Operating System Deployments. Version 2 is a Windows PowerShell display for ConfigMgr operating system task sequences. It shows task sequence activity, approximate progress, device details, elapsed time, a step timeline, and deployment status cards.
 
 The display is intended for on-site technicians. It is not a replacement for `smsts.log` or the ConfigMgr task sequence progress UI.
 
 ## Current status
 
-The repository contains the updated v2 script, a v2 example configuration, operator documentation, and a static mock render with fake device data. The mock render does not run the script.
+The repository contains the updated v2 script, an example configuration, operator documentation, and a static mock render with synthetic device data. The mock render does not run the script. It uses the Signal Ridge Labs brand and the Microsoft example domain `contoso.com`.
 
 Review findings are in [docs/review.md](docs/review.md). The task sequence setup guide is in [docs/task-sequence-setup.md](docs/task-sequence-setup.md). Configuration keys are in [docs/configuration.md](docs/configuration.md).
+
+The repository contains the full package, distribution, task sequence, and error handling procedures. External references and source figures are optional.
 
 ## Preview
 
 ![OSD-OSD v2 mock render with illustrative data](render/osd-osdv2-preview.png)
 
-The preview uses fake data. It does not contain a real hostname, serial number, IP address, or deployment log.
+The preview uses fake data. It does not contain a real hostname, serial number, IP address, or deployment log. The domain, hostname, network values, and hardware values are illustrative.
 
 ## Requirements
 
@@ -23,7 +25,7 @@ The preview uses fake data. It does not contain a real hostname, serial number, 
 - A ConfigMgr task sequence when live task sequence variables are required.
 - A ConfigMgr package that contains the script and the selected JSON configuration.
 
-The script shows preview progress values when a task sequence is not detected. It still reads real machine and network details in preview mode. Use the static render for an all-fake-data demonstration. Windows PE support depends on the boot image components and has not been validated in this repository.
+The script shows preview progress values when a task sequence is not detected. It still reads real machine and network details in preview mode. Do not use live preview mode for a recorded or shared demonstration. Use the static render for synthetic data. Windows PE support depends on boot image components and Windows Forms behavior. This repository has not validated it.
 
 ## Quick start
 
@@ -31,7 +33,7 @@ The script shows preview progress values when a task sequence is not detected. I
 2. Set the organization name, department, headline, colors, and step keywords in `config.json`.
 3. Optionally place an organization logo beside the script and set `LogoPath` to its filename.
 4. Run `osd-osdv2.ps1` in an approved Windows test environment.
-5. Follow [the task sequence setup guide](docs/task-sequence-setup.md) to package and launch it.
+5. Follow [the task sequence setup guide](docs/task-sequence-setup.md) to create and distribute the package, add launch steps, and pilot the task sequence.
 
 Do not commit `config.json` when it contains organization-specific values. The example contains only sample values. The Ctrl+Shift+D shortcut opens read-only diagnostics; it does not launch a command prompt or require a password.
 
@@ -52,6 +54,8 @@ Do not commit `config.json` when it contains organization-specific values. The e
 | `tools/Exit-OSDBackgroundWithOriginalCode.ps1` | Returns the saved task sequence failure code. |
 | `render/osd-osdv2-preview.png` | Rendered v2 sample with synthetic data. |
 | `render/osd-osdv2-preview.svg` | Editable source for the static render. |
+| `render/osd-osdv2-preview-left-aligned.png` | Alternate render with the status pill aligned to the sidebar heading. |
+| `render/osd-osdv2-preview-left-aligned.svg` | Editable source for the alternate render. |
 
 ## Task sequence state
 
