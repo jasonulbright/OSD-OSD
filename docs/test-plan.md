@@ -93,7 +93,6 @@ S7 applies only if you keep the early launch method. If it fails, remove the met
 Run one successful deployment and one controlled failure. Use the production boot image and a copy of the production task sequence. Use one device for each screen type in your hardware fleet.
 
 - The display is readable at the native screen size and scale in Windows PE and full Windows.
-- AppLocker, App Control for Business, and endpoint security tools do not block the script. The script uses `Add-Type` and a COM object, which [Constrained Language mode](https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_language_modes) restricts.
 - The keywords match the step names in the production task sequence.
 - The model, serial number, BIOS version, and network values are correct.
 - The display returns after each restart, including restarts for drivers, firmware, or BitLocker.
