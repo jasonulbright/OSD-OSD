@@ -41,6 +41,7 @@ Do not commit `config.json` when it contains organization-specific values. The e
 | `docs/unattend-launch.md` | Optional early full Windows launch from unattend.xml. |
 | `docs/attribution.md` | Microsoft Learn, source article, and figure credits. |
 | `docs/review.md` | Current task sequence design and lab validation checks. |
+| `docs/test-plan.md` | Test levels, open risks, lab setup, scenarios, and done criteria. |
 | `tools/Start-OSDBackground.cmd` | Starts the display as a separate process. |
 | `tools/Set-OSDBackgroundState.ps1` | Signals Running, Complete, or Failed to the display. |
 | `tools/Exit-OSDBackgroundWithOriginalCode.ps1` | Returns the saved task sequence failure code. |
