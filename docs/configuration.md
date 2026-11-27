@@ -1,62 +1,66 @@
 # Configuration reference
 
-OSD-OSD reads JSON from `config.json` beside the script by default. Use `-ConfigFile` to select another JSON filename. Relative filenames resolve from the script folder.
+`osd-osdv2.ps1` reads JSON from `config.json` beside the script by default. Use `-ConfigFile` to select another JSON filename. Relative filenames resolve from the script folder.
 
-Start from `config.example.json`. Keep organization-specific configuration out of Git.
+Start from `config.example.json`. The example includes `PreviewPercent` and `PreviewStep`. These values appear only when the script cannot connect to a task sequence. The script still reads real device and network information in this mode. Use the static preview image for synthetic data.
 
-## Top-level keys
+## Display text
 
 | Key | Type | Purpose |
 |---|---|---|
-| `CompanyName` | string | Organization name shown when no logo loads. |
-| `DepartmentName` | string | Department name shown when no logo loads. |
-| `Title` | string | Main display heading. |
-| `SubTitle` | string | Supporting text below the heading. |
-| `LogoPath` | string | Optional image filename relative to the script folder. |
-| `HideSCCMProgress` | boolean | Enables the existing task sequence progress window hiding code. The key keeps its legacy name. |
+| `CompanyName` | string | Organization name shown beside the built-in brand mark. |
+| `DepartmentName` | string | Department text shown below the organization name. The script displays it in uppercase. |
+| `Headline` | string | One or two headline lines separated by `|`. |
+| `OsName` | string | Operating system label below the headline. |
+| `StatusPill` | string | Status text in the pill at the top right. |
+| `InfoMessage` | string | Message in the information bar above the footer. |
+| `SupportTitle` | string | Support heading in the footer. |
+| `SupportText` | string | Support details in the footer. |
+| `DomainName` | string | Optional fixed domain name. When empty, the script checks task sequence, domain membership, and DNS data. |
+| `LogoPath` | string | Optional image filename relative to the script folder. A valid image replaces the built-in brand mark. |
+
+## Behavior
+
+| Key | Type | Purpose |
+|---|---|---|
+| `HideSCCMProgress` | boolean | Enables the existing code that hides the standard task sequence progress window. This key keeps its legacy name. |
 | `AutoCloseOnCompletion` | boolean | Closes the display after the script detects that the task sequence environment has ended. |
+| `NoEstimateSteps` | integer array | Step IDs where the script suppresses its remaining-time estimate. The default is `[2]`. |
+| `PreviewPercent` | integer | Percentage shown only when no task sequence is detected. |
+| `PreviewStep` | integer | Active step ID shown only when no task sequence is detected. |
 | `DebugPassword` | string | Legacy plaintext password for the Ctrl+Shift+D command prompt. Do not configure this feature on production devices. |
-| `Theme` | object | Window, card, text, and step colors. |
-| `Steps` | array | Ordered step names and action keyword lists. |
 
-## Theme keys
+The script starts the task sequence display with `PreviewPercent` and `PreviewStep` when no task sequence is detected. It does not replace the hardware and network values with synthetic values.
 
-Colors use HTML hex strings such as `#0F172A`.
+## Theme
+
+Colors use HTML hex strings such as `#0B1220`.
 
 | Key | Purpose |
 |---|---|
-| `Background` | Main window background. |
-| `SidebarBackground` | Step tracker background. |
-| `CardBackground` | Progress bar track and system information card. |
-| `AccentColor` | Main highlight and progress fill. |
-| `TextPrimary` | Main text. |
-| `TextSecondary` | Supporting text. |
-| `StepPendingBg`, `StepPendingText` | Pending step colors. |
-| `StepActiveBg`, `StepActiveText` | Active step colors. |
-| `StepDoneBg`, `StepDoneText` | Completed step colors. |
+| `Background` | Base background color. |
+| `CardBackground` | Card background color. |
+| `TextPrimary` | Main text color. |
+| `TextSecondary` | Supporting text color. |
+| `AccentColor` | Active and highlighted elements. |
+| `SuccessColor` | Completed elements. |
+
+The script uses built-in fallback colors when a theme value is empty or invalid.
 
 ## Steps
 
-Each entry has an integer `Id`, a visible `Name`, and `Keywords`. Keep IDs in the order shown. The script orders steps by numeric ID and advances the active indicator when a configured keyword matches `_SMSTSCurrentActionName`.
+Each entry has an integer `Id`, `Name`, and `Keywords` value. The optional fields are `ShortName`, `TimelineName`, `Description`, `DoneText`, and `StatusText`.
 
-`Keywords` can be a string separated by `|`, `;`, or `,`, or a JSON array of strings. Matching is case-insensitive and uses substring matching. Use specific phrases to reduce accidental matches. The active step moves forward and does not move backward during one process run.
+The top segmented bar uses `ShortName` when set. Otherwise it uses `Name`. The sidebar uses the first non-empty value from `TimelineName`, `ShortName`, and `Name`.
 
-Example:
+`Keywords` can be a string separated by `|`, `;`, or `,`, or an array of strings. Matching is case-insensitive and uses substring matching against `_SMSTSCurrentActionName`. The active step moves forward and the script saves its ID in `TSBackgroundCurrentStep`.
 
-```json
-{
-  "Id": 2,
-  "Name": "Operating System Installation",
-  "Keywords": "Apply Operating System|Apply Driver|WIM"
-}
-```
+## Data displayed
 
-## Data shown by the script
+The script reads task sequence variables through `Microsoft.SMS.TSEnvironment`. It reads the current action, computer name, next instruction pointer, and instruction table size. It also queries local hardware and network information through WMI.
 
-The display reads task sequence values through `Microsoft.SMS.TSEnvironment`. It reads the current action, computer name, next instruction pointer, and instruction table size. It also queries local hardware and network information through WMI.
-
-When no task sequence environment is available, the script displays a preview status. Device values that cannot be read show fallback text such as `Unknown` or `Detecting...`.
+The overall percentage is calculated from the next instruction pointer and instruction table size. It is a position indicator. It may not represent the amount of work remaining in a task sequence with branches or skipped actions.
 
 ## Security
 
-The legacy debug feature compares a typed value with `DebugPassword` in plaintext, then starts `cmd.exe` without alternate credentials. The configuration is not a safe access-control boundary. Do not use a shared password in a deployed package. See [the review](review.md).
+The legacy debug feature compares a typed value with `DebugPassword` in plaintext. It then starts `cmd.exe` without alternate credentials. The command prompt uses the script process security context. The configuration is not a safe access-control boundary. Do not put a shared password in a deployed package. See [the review](review.md).

@@ -2,4 +2,5 @@
 
 ## Unreleased
 
-- Add the initial static review, configuration guide, task sequence setup guide, and fake-data preview.
+- Replace the older interface with the updated v2 display.
+- Add v2 configuration, task sequence setup guidance, and a fake-data preview.

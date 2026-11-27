@@ -1,49 +1,78 @@
 {
-  "CompanyName": "Your Company",
-  "DepartmentName": "IT Department",
-  "Title": "Windows Deployment in Progress",
-  "SubTitle": "Please wait while your device is being configured automatically.",
-  "LogoPath": "logo.png",
+  "CompanyName": "Northwind Systems",
+  "DepartmentName": "Endpoint Services",
+  "Headline": "Preparing your|new workspace",
+  "OsName": "Windows 11 Enterprise",
+  "StatusPill": "DEPLOYMENT IN PROGRESS",
+  "InfoMessage": "Keep the device connected to power.",
+  "SupportTitle": "IT Support - Service Desk",
+  "SupportText": "For assistance, contact the IT help desk.",
+  "DomainName": "",
+  "LogoPath": "",
   "HideSCCMProgress": false,
   "AutoCloseOnCompletion": true,
+  "PreviewPercent": 68,
+  "PreviewStep": 3,
+  "NoEstimateSteps": [
+    2
+  ],
   "Theme": {
-    "Background": "#0F172A",
-    "SidebarBackground": "#1E293B",
-    "CardBackground": "#1E293B",
-    "AccentColor": "#38BDF8",
-    "TextPrimary": "#FFFFFF",
+    "Background": "#0B1220",
+    "CardBackground": "#172337",
+    "TextPrimary": "#F1F5F9",
     "TextSecondary": "#94A3B8",
-    "StepPendingBg": "#0F172A",
-    "StepPendingText": "#64748B",
-    "StepActiveBg": "#0284C7",
-    "StepActiveText": "#FFFFFF",
-    "StepDoneBg": "#064E3B",
-    "StepDoneText": "#4ADE80"
+    "AccentColor": "#22D3EE",
+    "SuccessColor": "#22C55E"
   },
   "Steps": [
     {
       "Id": 1,
-      "Name": "Preparation & Partitioning",
-      "Keywords": "Partition|Format and|Pre-provision"
+      "Name": "Device preparation",
+      "ShortName": "Prepare",
+      "TimelineName": "Device preparation",
+      "Description": "Partitioning the disk",
+      "DoneText": "Disk partitioning complete",
+      "StatusText": "Preparing the disk",
+      "Keywords": "Partition|Format and|Pre-provision|UI++"
     },
     {
       "Id": 2,
-      "Name": "Operating System Installation",
+      "Name": "Operating system",
+      "ShortName": "Windows",
+      "TimelineName": "Operating system",
+      "Description": "Applying Windows image",
+      "DoneText": "Windows image applied",
+      "StatusText": "Installing the operating system",
       "Keywords": "Apply Operating System|Apply Driver|Auto Apply|WIM"
     },
     {
       "Id": 3,
-      "Name": "Network & Domain Configuration",
-      "Keywords": "Setup Windows and Configuration Manager|Join Domain"
+      "Name": "Network configuration",
+      "ShortName": "Network",
+      "TimelineName": "Network configuration",
+      "Description": "Configuring network settings",
+      "DoneText": "Network configured",
+      "StatusText": "Configuring network and domain",
+      "Keywords": "Setup Windows and Configuration Manager|Setup Windows and ConfigMgr|Join Domain"
     },
     {
       "Id": 4,
-      "Name": "Application Installation",
-      "Keywords": "Install Application|Install Package|Install Software"
+      "Name": "Applications and drivers",
+      "ShortName": "Software",
+      "TimelineName": "Applications and drivers",
+      "Description": "Installing software and drivers",
+      "DoneText": "Software and drivers installed",
+      "StatusText": "Installing applications",
+      "Keywords": "Install Application|Install Package|Install Software|Office|Adobe"
     },
     {
       "Id": 5,
-      "Name": "Deployment Finalization",
+      "Name": "Finalization",
+      "ShortName": "Finish",
+      "TimelineName": "Finalization",
+      "Description": "Preparing for first use",
+      "DoneText": "Ready for first use",
+      "StatusText": "Finalizing the deployment",
       "Keywords": "Enable BitLocker|Finalize|Cleanup"
     }
   ]

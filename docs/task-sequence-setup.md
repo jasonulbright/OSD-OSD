@@ -1,21 +1,21 @@
 # Task sequence setup
 
-This guide describes how to add OSD-OSD to a ConfigMgr operating system deployment task sequence. Validate the launch flow on a test collection before production use.
+This guide describes how to add OSD-OSD v2 to a ConfigMgr operating system deployment task sequence. Validate the launch flow on a test collection before production use.
 
 ## Before you start
 
 - Use a test task sequence and test device.
 - Confirm that the display can run in each phase where you need it.
-- Use a package source folder with `OSD-OSD.ps1`, `config.json`, and an optional logo file.
+- Use a package source folder with `osd-osdv2.ps1`, `config.json`, and an optional logo file.
 - Keep `config.json` in the package source. Do not put credentials in it.
 - Distribute the package to every distribution point used by the deployment.
 
-The task sequence `Run PowerShell Script` action waits for the script to finish. OSD-OSD shows a modal Windows Forms window until the user closes it or the task sequence is detected as complete. Start the UI from an asynchronous launcher so the task sequence can continue. The example below uses `cmd.exe` and `start` to return from the action while PowerShell owns the display. Confirm this behavior on your ConfigMgr version and boot image.
+The task sequence **Run PowerShell Script** action waits for the script to finish. OSD-OSD shows a modal Windows Forms window until the user closes it or the task sequence is detected as complete. Start the UI from an asynchronous launcher so the task sequence can continue. The example below uses `cmd.exe` and `start` to return from the action while PowerShell owns the display. Confirm this behavior on your ConfigMgr version and boot image.
 
 ## Prepare the package
 
 1. Create a source folder, for example `OSD-OSD`.
-2. Copy `OSD-OSD.ps1` into the folder.
+2. Copy `osd-osdv2.ps1` into the folder.
 3. Copy `config.example.json` into the folder as `config.json`.
 4. Edit the organization text, theme, steps, and keywords in `config.json`.
 5. Copy an approved logo into the folder if you use one.
@@ -33,7 +33,7 @@ The package does not need a program. The task sequence command line references i
 4. Set **Command line** to:
 
 ```text
-cmd.exe /c start "" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "OSD-OSD.ps1" -ConfigFile "config.json"
+cmd.exe /c start "" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "osd-osdv2.ps1" -ConfigFile "config.json"
 ```
 
 5. Set **Start in** to the package folder if the console offers that field for the action.
@@ -49,7 +49,7 @@ Add a launch step after the device enters a phase that supports the display. Add
 
 If you want a display during Windows PE, first confirm that the boot image has the required PowerShell, .NET, and Windows Forms support. A script that starts in full Windows does not prove that it can start in Windows PE.
 
-Do not rely on this display as the only progress signal. Keep the ConfigMgr task sequence progress window enabled during the pilot until you confirm how the custom display behaves in WinPE and full Windows.
+Do not rely on this display as the only progress signal. Keep the ConfigMgr task sequence progress window enabled during the pilot until you confirm how the custom display behaves in Windows PE and full Windows.
 
 ## Pilot checklist
 
