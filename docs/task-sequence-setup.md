@@ -90,7 +90,7 @@ The helper scripts are in `tools`. The error handler can save logs or run organi
 7. Complete a successful deployment. Confirm that the success group sets the explicit completion state.
 8. Test every reboot boundary where the display must return.
 9. Confirm that the normal progress UI and `smsts.log` remain available for recovery.
-10. Review `TSBackground-OSD.log` under `%SystemRoot%\Temp` and the task sequence log.
+10. Review `osd-osd.log` under `%SystemRoot%\Temp` and the task sequence log.
 
 Do not hide the ConfigMgr progress window until the display and the error path pass these checks on the target boot image and Windows build.
 

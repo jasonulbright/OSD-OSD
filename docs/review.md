@@ -11,7 +11,7 @@ The review covers `osd-osdv2.ps1` build `2611.27.003`, the ConfigMgr task sequen
 | Shared plaintext debug password launched `cmd.exe` in the display process security context. | A package-level password is not an access control boundary. The command prompt may run with task sequence rights. | Remove password handling and the command prompt. Keep Ctrl+Shift+D as a read-only diagnostic summary. | Fixed in build `2611.27.003`. Remove old `DebugPassword` values from local configs. |
 | The display uses `ShowDialog()`. | A direct **Run PowerShell Script** step waits for the form to close and blocks the task sequence. | Use `tools/Start-OSDBackground.cmd` from a **Run Command Line** step. It starts PowerShell as a separate process and returns. | Implemented. Confirm the action returns and the display appears in the target deployment session. |
 | The display did not relaunch after a reboot. | The form process ends when the computer restarts. | Add launch steps after each reboot where the display must return. Use the optional specialize launch in `unattend.xml` for the early full Windows phase. | Documented. Validate every reboot boundary in a lab. |
-| The display treated 20 failed task sequence polls as successful completion. | A connection loss can result from a failure or restart. Technicians could see a false success state. | Require `TSBackgroundState=Complete` or `TSBackgroundState=Failed`. Keep status unknown when the connection disappears without a signal. | Fixed. Add the success and error groups described in `docs/error-handling.md`. |
+| The display treated 20 failed task sequence polls as successful completion. | A connection loss can result from a failure or restart. Technicians could see a false success state. | Require `TSBackgroundState=Complete` or `TSBackgroundState=Failed`. Keep status unknown when the connection disappears without a signal. | Display behavior fixed. Add the success and error groups described in `docs/error-handling.md` to the task sequence. |
 | Progress uses the next instruction pointer divided by the instruction table size. | Branches, skipped actions, and variable task durations make this a position indicator, not a measure of work completed. Remaining time can be inaccurate. | Label the percentage as approximate progress. Keep time as an estimate and avoid estimates in configured long steps. | Fixed in build `2611.27.003`; the UI says `APPROXIMATE PROGRESS`. The guide describes remaining time as an estimate. |
 | Preview mode reads real local device and network details. | A live preview can expose a hostname, serial number, domain, IP address, or MAC address on a recorded or shared screen. | Use the synthetic static render for demonstrations. A future preview-data option could replace every hardware field with configured sample values. | Documented limit. `render/osd-osdv2-preview.png` uses fake values. |
 | The script header and UI showed different version formats. | Operators could report different build identities for one file. | Keep one build identifier in the source header and UI footer. | Fixed in build `2611.27.003`. |
@@ -31,8 +31,18 @@ OSD-OSD is a foreground display. It does not replace `smsts.log`, the ConfigMgr 
 - The script caches its background bitmap and fonts between refreshes.
 - The step tracker shows completed, active, and pending phases with separate labels.
 - The remaining-time logic suppresses guesses during configured long steps.
-- The script logs diagnostics to `%SystemRoot%\Temp\TSBackground-OSD.log` and limits repeated error messages with `Write-LogOnce`.
+- The script logs diagnostics to `%SystemRoot%\Temp\osd-osd.log` and limits repeated error messages with `Write-LogOnce`.
 - The repository preview is a static render with synthetic device data.
+
+## Remaining work
+
+- [ ] Run a ConfigMgr lab pilot. Confirm that the asynchronous launch returns and that the UI is visible in each intended phase.
+- [ ] Test the Windows PE and full Windows launch points after every required reboot.
+- [ ] Test the success and error groups. Confirm that the display reports both states and that the error path preserves the original return code.
+- [ ] Test the optional specialize-pass `unattend.xml` launch. Confirm that the form appears in the technician's visible session and that the task sequence continues.
+- [ ] Decide whether an external cleanup action is needed. If needed, implement and test a process-scoped stop action. Do not stop PowerShell by process name.
+- [ ] Review the 45 PSScriptAnalyzer warnings in the main display script. Fix only valid issues; the two helper scripts have no findings.
+- [ ] Optional: add synthetic device data to live preview mode. The static render already uses fake data.
 
 ## Review limits
 

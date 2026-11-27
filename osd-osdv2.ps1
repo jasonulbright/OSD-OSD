@@ -41,8 +41,8 @@ public class Win32Window {
 Add-Type -TypeDefinition $Win32Code -ErrorAction SilentlyContinue
 try { [void][Win32Window]::SetProcessDPIAware() } catch { }
 
-# --- Diagnostic log (read it with: type %SystemRoot%\Temp\TSBackground-OSD.log) ---
-$LogFile = Join-Path $env:SystemRoot "Temp\TSBackground-OSD.log"
+# --- Diagnostic log (read it with: type %SystemRoot%\Temp\osd-osd.log) ---
+$LogFile = Join-Path $env:SystemRoot "Temp\osd-osd.log"
 function Write-Log {
     param([string]$Message)
     try { Add-Content -Path $LogFile -Value ("{0} {1}" -f (Get-Date -Format "HH:mm:ss"), $Message) -ErrorAction SilentlyContinue } catch { }

@@ -9,4 +9,5 @@
 - Replace the shared debug password and command prompt with read-only diagnostics.
 - Keep task sequence connection loss in an unknown state instead of reporting false success.
 - Label the task sequence position value as approximate progress.
+- Rename the diagnostic log to `osd-osd.log` and list remaining review work.
 - Add source attributions and linked CCMEXEC figures.
