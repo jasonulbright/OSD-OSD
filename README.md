@@ -1,16 +1,16 @@
 # OSD-OSD
 
-OSD-OSD means On Screen Display of Operating System Deployments. Version 2 is a Windows PowerShell display for ConfigMgr operating system task sequences. It shows task sequence activity, approximate progress, device details, elapsed time, a step timeline, and deployment status cards.
+OSD-OSD means On Screen Display of Operating System Deployments. It is a Windows PowerShell display for ConfigMgr operating system task sequences. It shows task sequence activity, approximate progress, device details, elapsed time, a step timeline, and deployment status cards.
 
 The display is intended for on-site technicians. It is not a replacement for `smsts.log` or the ConfigMgr task sequence progress UI.
 
 ## Current status
 
-The repository contains the updated v2 script, an example configuration, operator documentation, and a static mock render with synthetic device data. The mock render does not run the script. It uses the Signal Ridge Labs brand and the Microsoft example domain `contoso.com`.
+The current release is `2611.27.004`. The repository contains the display script, an example configuration, operator documentation, and a static mock render with synthetic device data. The mock render does not run the script. It uses the Signal Ridge Labs brand and the Microsoft example domain `contoso.com`.
 
 Review findings are in [docs/review.md](docs/review.md). The task sequence setup guide is in [docs/task-sequence-setup.md](docs/task-sequence-setup.md). Configuration keys are in [docs/configuration.md](docs/configuration.md).
 
-The repository contains the full package, distribution, task sequence, and error handling procedures. External references and source figures are optional.
+The repository contains the complete package setup, distribution, task sequence, and error handling procedures. External references and source figures are optional.
 
 ## Preview
 
@@ -54,10 +54,15 @@ Do not commit `config.json` when it contains organization-specific values. The e
 | `tools/Exit-OSDBackgroundWithOriginalCode.ps1` | Returns the saved task sequence failure code. |
 | `render/osd-osdv2-preview.png` | Rendered v2 sample with synthetic data. |
 | `render/osd-osdv2-preview.svg` | Editable source for the static render. |
+| `LICENSE` | MIT license. |
 
 ## Task sequence state
 
 The script stores `TSBackgroundStartTime` and `TSBackgroundCurrentStep` through `Microsoft.SMS.TSEnvironment`. Explicit `TSBackgroundState` signals control complete and failed status. Loss of the task sequence connection does not count as success. The script does not install a startup task or relaunch itself after a reboot. See [the setup guide](docs/task-sequence-setup.md), [error handling](docs/error-handling.md), and [the review](docs/review.md) before deployment.
+
+## Releases
+
+Each release includes release notes and GitHub's automatically generated source ZIP. The project does not publish an installer or a separate release package. The source ZIP contains the repository files for administrators to package in ConfigMgr.
 
 ## Attribution
 
@@ -65,4 +70,4 @@ The setup and error handling guidance builds on the referenced posts by Jörgen 
 
 ## License
 
-No license has been selected. Do not redistribute this project until the owner adds a license.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).

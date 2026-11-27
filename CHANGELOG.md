@@ -1,18 +1,23 @@
 # Change log
 
-## Unreleased
+## v2611.27.004 - 2026-11-27
 
-- Replace legacy PowerShell WMI cmdlets with local `Get-CimInstance` queries. Remove all shared PSScriptAnalyzer findings from the display script.
-- Replace the older interface with the updated v2 display.
-- Add v2 configuration, task sequence setup guidance, and a fake-data preview.
-- Add asynchronous launch and unattend launch guidance with helper scripts.
-- Add explicit task sequence success and failure states.
-- Replace the shared debug password and command prompt with read-only diagnostics.
-- Keep task sequence connection loss in an unknown state instead of reporting false success.
-- Label the task sequence position value as approximate progress.
-- Rename the diagnostic log to `osd-osd.log` and list remaining review work.
-- Add source attributions and linked CCMEXEC figures.
-- Align the deployment status dot with the sidebar timeline markers and refresh the synthetic preview with Signal Ridge Labs and `contoso.com` data.
-- Expand the task sequence guide with package creation, content distribution, boot image setup, launch steps, conditions, and pilot checks.
-- Correct the success and error group order and document helper command lines.
-- State that third-party setup references are optional; the repository guides contain the complete setup procedure.
+### Display
+
+- Show task sequence activity, approximate progress, device details, elapsed time, and deployment status.
+- Use explicit task sequence signals for completion and failure; show unknown when connection is lost.
+- Query local hardware and network information with `Get-CimInstance`.
+- Align the status indicator with the installation step timeline.
+- Keep diagnostics read-only and write to `osd-osd.log`.
+- Clear all 45 shared PSScriptAnalyzer findings in the display script.
+
+### Task sequence support
+
+- Add an asynchronous launcher and helpers for state signaling and original failure codes.
+- Document complete package setup, boot image support, launch steps, error handling, and optional unattend launch.
+
+### Documentation and preview
+
+- Add configuration and attribution guides with synthetic Signal Ridge Labs preview data.
+- License the repository under the MIT License.
+- Document GitHub's generated source ZIP as the release archive; no installer is provided.
