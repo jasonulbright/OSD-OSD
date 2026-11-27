@@ -44,7 +44,8 @@ Do not commit `config.json`. It is ignored because it can contain organization-s
 | `docs/task-sequence-setup.md` | ConfigMgr package and task sequence steps. |
 | `docs/configuration.md` | Configuration key reference and keyword behavior. |
 | `docs/review.md` | Review findings and known limits. |
-| `render/osd-osdv2-preview.svg` | Static v2 sample render with fake data. |
+| `render/osd-osdv2-preview.png` | Rendered v2 sample with synthetic data. |
+| `render/osd-osdv2-preview.svg` | Editable source for the static render. |
 
 ## Task sequence state
 
